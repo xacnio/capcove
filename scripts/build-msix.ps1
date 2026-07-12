@@ -162,8 +162,14 @@ if ($Sign) {
     # Self-signed cert needs to be in both Trusted Root and Trusted People for
     # Add-AppxPackage to accept it; re-checked every run in case a prior run
     # created the cert but couldn't get admin to trust it.
+    #
+    # Matched by thumbprint, not subject — `$CertSubject` is a static string,
+    # so a regenerated cert (e.g. after deleting `.cert\`) shares it with
+    # whatever was trusted before, and a subject-only check would wrongly
+    # skip re-importing the new one.
+    $CurrentCert = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($PfxPath, $PfxPassword)
     $alreadyTrusted = Get-ChildItem "Cert:\LocalMachine\Root" -ErrorAction SilentlyContinue |
-        Where-Object { $_.Subject -eq $CertSubject }
+        Where-Object { $_.Thumbprint -eq $CurrentCert.Thumbprint }
     if (-not $alreadyTrusted) {
         Write-Host "==> Trusting certificate for local installs (admin required)" -ForegroundColor Yellow
         try {
