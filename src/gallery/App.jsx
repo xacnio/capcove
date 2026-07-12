@@ -35,6 +35,7 @@ export default function App() {
   const [view, setView] = useState("folders");
   const [editorPath, setEditorPath] = useState(null); // source file for the editor view
   const [openPlayerRequest, setOpenPlayerRequest] = useState(null); // {path, name} | null — dev-only, see store_screenshots.rs's "goto-player"
+  const [closePlayerToken, setClosePlayerToken] = useState(0); // dev-only, see store_screenshots.rs's "close-player"
   const [connected, setConnected] = useState(false);
   const [driveEmail, setDriveEmail] = useState(null);
   const [drivePhoto, setDrivePhoto] = useState(null);
@@ -437,6 +438,7 @@ export default function App() {
           else if (payload?.action === "goto-settings") { setSettingsRequest({ page: payload.page, tab: payload.tab }); setView("settings"); }
           else if (payload?.action === "goto-editor") { setEditorPath(payload.path); setView("editor"); }
           else if (payload?.action === "goto-player") { setView("gallery"); setOpenPlayerRequest({ path: payload.path, name: payload.name }); }
+          else if (payload?.action === "close-player") setClosePlayerToken((t) => t + 1);
           else if (payload?.action === "set-view-mode") setViewModePersist(payload.mode);
           else if (payload?.action === "set-replay-demo") {
             demoReplayFrozenRef.current = true;
@@ -772,6 +774,7 @@ export default function App() {
           onHighlightDone={() => setHighlightVideoName(null)}
           openPlayerRequest={openPlayerRequest}
           onOpenPlayerDone={() => setOpenPlayerRequest(null)}
+          closePlayerToken={closePlayerToken}
         />
         </div>
         </div>

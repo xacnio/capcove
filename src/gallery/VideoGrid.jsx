@@ -1207,7 +1207,7 @@ function ListHeaderCell({ label, field, align, sortBy, onSortChange }) {
   );
 }
 
-export default function VideoGrid({ t, lang, tags, recording, tagFilter, kindFilter, favoritesOnly, selectedGame, selectedFolderId, rootOnly, tiles = [], tilesLabel, onOpenTile, onTileContextMenu, search, sortBy, onSortChange, groupBy, viewMode, onVideosChanged, onFilteredCount, onEdit, refreshToken, onRefreshingChange, onShowInFolderView, highlightName, onHighlightDone, openPlayerRequest, onOpenPlayerDone }) {
+export default function VideoGrid({ t, lang, tags, recording, tagFilter, kindFilter, favoritesOnly, selectedGame, selectedFolderId, rootOnly, tiles = [], tilesLabel, onOpenTile, onTileContextMenu, search, sortBy, onSortChange, groupBy, viewMode, onVideosChanged, onFilteredCount, onEdit, refreshToken, onRefreshingChange, onShowInFolderView, highlightName, onHighlightDone, openPlayerRequest, onOpenPlayerDone, closePlayerToken }) {
   const [videos, setVideos] = useState(null); // null = loading
   const [playing, setPlaying] = useState(null);
   // Dev-only: opens an arbitrary local file directly in the player, bypassing
@@ -1227,6 +1227,15 @@ export default function VideoGrid({ t, lang, tags, recording, tagFilter, kindFil
     onOpenPlayerDone?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openPlayerRequest]);
+  // Dev-only: closes the player opened above — `view` alone (`goto-view`)
+  // doesn't do this, since "folders"/"gallery" are both this same mounted
+  // component with `playing` as its own internal state, not tied to `view`.
+  // See store_screenshots.rs's "close-player" action.
+  useEffect(() => {
+    if (!closePlayerToken) return;
+    setPlaying(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [closePlayerToken]);
   const [playerMenuOpen, setPlayerMenuOpen] = useState(false);
   const [playerMenuPos, setPlayerMenuPos] = useState(null);
   const [youtubeTarget, setYoutubeTarget] = useState(null); // video or null

@@ -671,7 +671,11 @@ async fn capture_trim_tool(app: &AppHandle, lang_dir: &Path) -> Result<()> {
     // The player's own video element needs a moment to load metadata/first frame.
     tokio::time::sleep(Duration::from_millis(1200)).await;
     let result = capture_current(app, &lang_dir.join("14-editor.png")).await;
-    // Leave the app back on the folders view for the next language pass.
+    // `playing` is VideoGrid's own internal state, not tied to `view` — a
+    // plain `goto-view` back to "folders" left the player modal mounted and
+    // visible on top of every following scene (including the whole next
+    // language pass) until this was added.
+    send_cmd_and_wait(app, json!({"action":"close-player"})).await;
     send_cmd_and_wait(app, json!({"action":"goto-view","view":"folders"})).await;
     result
 }
