@@ -48,7 +48,7 @@ impl DriveClient {
         login_hint: Option<&str>,
         open_browser: impl FnOnce(String) + Send + 'static,
     ) -> Result<String> {
-        let scope = "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive";
+        let scope = "https://www.googleapis.com/auth/drive.file";
         let mut tokens = self.oauth_flow(client_id, client_secret, scope, "consent", login_hint, open_browser).await?;
 
         if let Ok(resp) = self
