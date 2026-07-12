@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Capcove</title>
+    <style>
+      /* Three badges, same visual language: a plain black-70%-opacity
+         circle with a simple flat white glyph — no color-coding, no
+         drop shadows. Inactive ones are `display: none` (not just
+         hidden) so the flex row only ever takes up the space the
+         active badges need — the Rust side sizes the window to match
+         exactly (see hud.rs's `compute_size`). Their SVG content is
+         filled in by main.js from the shared hudIcons.js library, per
+         the user's chosen icon for each badge. */
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0; padding: 0; width: 100vw; height: 100vh;
+        background: transparent; overflow: hidden;
+      }
+      body {
+        display: flex; flex-direction: row; align-items: center;
+        justify-content: flex-start; gap: 6px;
+      }
+      .badge {
+        display: none;
+        width: 28px; height: 28px; flex-shrink: 0;
+        border-radius: 50%;
+        background: rgba(0, 0, 0, 0.7);
+        align-items: center; justify-content: center;
+      }
+      .badge.on { display: flex; }
+      .badge svg { width: 15px; height: 15px; fill: #ffffff; }
+    </style>
+  </head>
+  <body>
+    <div id="badge-recording" class="badge"><svg viewBox="0 0 24 24"></svg></div>
+    <div id="badge-buffer" class="badge"><svg viewBox="0 0 24 24"></svg></div>
+    <div id="badge-mic" class="badge"><svg viewBox="0 0 24 24"></svg></div>
+    <script type="module" src="/src/rec-hud/main.js"></script>
+  </body>
+</html>

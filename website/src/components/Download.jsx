@@ -1,0 +1,71 @@
+import { FiDownload } from "react-icons/fi";
+import { formatBytes, assetLabel, sortByArch, MS_STORE_URL, msStoreBadgeUrl } from "../lib/platform.js";
+import { useLanguage } from "../lib/LanguageContext.jsx";
+
+// Windows-only for now — see `Hero.jsx`'s matching hardcoded `platform`.
+const PLATFORM_KEYS = ["windows"];
+
+export default function Download({ latestRelease }) {
+  const { t, lang } = useLanguage();
+  const downloads = latestRelease?.downloads ?? [];
+  const platforms = t("download.platforms");
+
+  return (
+    <section id="download" className="max-w-6xl mx-auto px-6 py-24 border-t border-stone-800/80">
+      <h2 className="text-3xl font-bold tracking-tight">{t("download.title")}</h2>
+      <p className="mt-2 text-stone-400">
+        {latestRelease ? t("download.latestRelease")(latestRelease.name) : t("download.noRelease")}
+      </p>
+
+      <div className="mt-8 grid max-w-sm gap-4">
+        {PLATFORM_KEYS.map((key) => {
+          const p = platforms[key];
+          const assets = sortByArch(downloads.filter((d) => d.platform === key));
+          return (
+            <div key={key} className="rounded-xl border border-stone-800 bg-stone-900/60 p-5 flex flex-col">
+              <h3 className="font-semibold text-stone-100">{p.label}</h3>
+              <p className="text-xs text-stone-500 mt-1 mb-4">{p.note}</p>
+              <div className="mt-auto flex flex-col gap-2">
+                {key === "windows" && (
+                  <a href={MS_STORE_URL} target="_blank" rel="noreferrer" className="inline-block mb-1">
+                    <img src={msStoreBadgeUrl(lang)} alt={t("download.msStore")} width={180} className="h-auto" />
+                  </a>
+                )}
+                {assets.length === 0 && (
+                  <span className="text-xs text-stone-500">{t("download.notAvailable")}</span>
+                )}
+                {assets.map((a) => (
+                  <a
+                    key={a.url}
+                    href={a.url}
+                    className="flex items-center justify-between gap-2 text-sm rounded-md border border-stone-700/80 px-3 py-2 hover:border-accent-500/60 hover:bg-accent-500/5 transition-colors group"
+                  >
+                    <span className="flex items-center gap-2 text-stone-300 group-hover:text-stone-100">
+                      <FiDownload size={14} className="text-stone-500 group-hover:text-accent-400" />
+                      {assetLabel(a.name)}
+                      {a.arch === "arm64" && (
+                        <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded px-1.5 py-0.5">
+                          ARM64
+                        </span>
+                      )}
+                    </span>
+                    <span className="text-xs text-stone-500">{formatBytes(a.size)}</span>
+                  </a>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <a
+        href="https://github.com/xacnio/capcove/releases"
+        target="_blank"
+        rel="noreferrer"
+        className="inline-block mt-6 text-sm text-stone-400 hover:text-stone-100 transition-colors"
+      >
+        {t("download.viewAll")}
+      </a>
+    </section>
+  );
+}

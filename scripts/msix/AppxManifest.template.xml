@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Package
+    xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+    xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+    xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
+    xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+    IgnorableNamespaces="uap uap10 rescap">
+
+    <!-- Identity Name is tied to the existing Store listing (9P3T7Q4B3PXZ);
+         changing it requires a brand-new submission, so keep it as-is. -->
+    <Identity
+        Name="Alperenetin.Capcove"
+        Publisher="CN=AB590003-9108-4489-A869-366AA4C19104"
+        Version="{{VERSION}}"
+        ProcessorArchitecture="{{ARCH}}" />
+
+    <Properties>
+        <DisplayName>Capcove</DisplayName>
+        <PublisherDisplayName>xacnio</PublisherDisplayName>
+        <Description>Screen capture and video recording tool with Google Drive sync</Description>
+        <Logo>Assets\StoreLogo.png</Logo>
+        <uap10:PackageIntegrity>
+            <uap10:Content Enforcement="on" />
+        </uap10:PackageIntegrity>
+    </Properties>
+
+    <Resources>
+        <Resource Language="en-us" />
+        <Resource Language="tr-tr" />
+    </Resources>
+
+    <Dependencies>
+        <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.22621.0" />
+    </Dependencies>
+
+    <Capabilities>
+        <rescap:Capability Name="runFullTrust" />
+    </Capabilities>
+
+    <Applications>
+        <Application Id="CAPCOVE" Executable="VFS\Local AppData\Capcove\capcove.exe" EntryPoint="Windows.FullTrustApplication">
+            <uap:VisualElements
+                DisplayName="Capcove"
+                Description="Capcove"
+                BackgroundColor="transparent"
+                Square150x150Logo="Assets\CAPCOVE-Square150x150Logo.png"
+                Square44x44Logo="Assets\CAPCOVE-Square44x44Logo.png">
+                <uap:DefaultTile Wide310x150Logo="Assets\CAPCOVE-Wide310x150Logo.png" Square310x310Logo="Assets\CAPCOVE-Square310x310Logo.png" Square71x71Logo="Assets\CAPCOVE-Square71x71Logo.png" />
+            </uap:VisualElements>
+        </Application>
+    </Applications>
+</Package>

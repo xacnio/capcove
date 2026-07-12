@@ -1,0 +1,30 @@
+{
+  "en": {
+    "open_gallery": "Open Gallery",
+    "open_folder": "Open Recordings Folder",
+    "sync_now": "Sync Now",
+    "settings": "Settings",
+    "shortcuts_enabled": "Shortcuts enabled",
+    "quit": "Quit",
+    "capture_record_window": "Record Window",
+    "capture_record_area": "Record Area",
+    "capture_record_monitor": "Record Screen",
+    "action_save_replay": "Save Replay",
+    "action_open_wheel": "Shortcut Wheel",
+    "recording_status": "Recording"
+  },
+  "tr": {
+    "open_gallery": "Galeriyi aç",
+    "open_folder": "Kayıtlar klasörünü aç",
+    "sync_now": "Şimdi senkronize et",
+    "settings": "Ayarlar",
+    "shortcuts_enabled": "Kısayollar etkin",
+    "quit": "Çıkış",
+    "capture_record_window": "Pencereyi Kaydet",
+    "capture_record_area": "Alanı Kaydet",
+    "capture_record_monitor": "Ekranı Kaydet",
+    "action_save_replay": "Replay'i Kaydet",
+    "action_open_wheel": "Kısayol Çarkı",
+    "recording_status": "Kayıt"
+  }
+}

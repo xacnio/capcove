@@ -1,0 +1,95 @@
+export default {
+  scrollToTop: "Yukarı kaydır",
+  nav: { features: "Özellikler", download: "İndir", changelog: "Güncellemeler" },
+  header: { download: "İndir" },
+  hero: {
+    titleLine1: "Kaydet, tekrar izle, paylaş.",
+    titleLine2: "Her zaman açık, görünmez.",
+    desc: "Capcove, sistem tepsisinde çalışan bir ekran ve oyun kayıt aracıdır. Bir pencereyi, monitörü veya alanı kaydedin, bir Instant Replay tamponunu açık tutun ve YouTube'a yayın yapın — kayıtlar kendiliğinden Google Drive'a senkronize olur.",
+    downloadFor: (platform) => `${platform} için indir`,
+    otherPlatforms: "Diğer platformlar",
+    otherArch: "Farklı mimari seç",
+    license: "Ücretsiz ve açık kaynak · MIT lisanslı",
+    screenshotAlt: "Capcove'un radyal Çark HUD'u, kayıt sırasında",
+    screenshotPlaceholder: "Çark: Save Replay aksiyonu vurgulanmış, canlı 'şu an oynanıyor' oyun kartıyla",
+  },
+  platform: { windows: "Windows", macos: "macOS", linux: "Linux" },
+  features: {
+    title: "İhtiyacın olan her şey, gereksiz hiçbir şey yok",
+    desc: "Capcove, iş akışınıza sızmak için tasarlandı — kayıt hafif kalır, senkronizasyon ve yayın arka planda gerçekleşir.",
+    placeholderLabel: "Ekran görüntüsü yer tutucusu",
+    items: [
+      {
+        title: "Her zaman çalışan Instant Replay",
+        desc: "Dönen bir tampon, son birkaç dakikayı yeniden kodlama yapmadan anında kaydetmeye hazır tutar — algılanan bir oyun başlar başlamaz kendiliğinden devreye girer. Çark, HUD ve toast bildirimleri, aynı anda çalışan başka herhangi bir kayıt veya yayın yazılımından görünmez kalır.",
+        placeholder: "Çark: Save Replay aksiyonu vurgulanmış, canlı 'şu an oynanıyor' oyun kartıyla",
+      },
+      {
+        title: "Bir pencereyi, monitörü veya sadece bir alanı kaydedin",
+        desc: "Bir alan sürükleyin, Capcove tam olarak orayı kaydeder; kenara çekebileceğiniz yüzen bir kontrol çubuğuyla birlikte — çerçeve ya da çubuk kayda hiçbir şekilde yansımaz. Capcove, kayıtlar arasında sistem tepsisinde kalmaya devam eder; isteğe bağlı otomatik başlatma ve yönetici modu ile.",
+        placeholder: "Galeri üzerinde yüzen alan-kayıt kontrol çubuğu ve kesik çizgili seçim çerçevesi",
+      },
+      {
+        title: "Oynatıcıdan çıkmadan kırpın",
+        desc: "Başlangıç ve bitiş tutamaçlarını doğrudan zaman çizelgesinde sürükleyin, kare hassasiyetinde kesim için basılı tutarak yakınlaştırın ve sonucu orijinalin yanına klip olarak kaydedin — ya da önce çözünürlük, kodlayıcı ve bit hızı seçmek için Gelişmiş Dışa Aktarma'yı açın.",
+        placeholder: "Video oynatıcının kırpma aracı: sürüklenebilir tutamaçlar, dalga formu, Klibi Kaydet ve Gelişmiş Dışa Aktarma kontrolleri",
+      },
+      {
+        title: "İstediğiniz gibi donanım kodlama",
+        desc: "H.264, HEVC veya AV1'de NVIDIA NVENC, AMD AMF ve Intel QSV, GPU'ya dokunmak istemezseniz yazılım alternatifleriyle (x264, x265, SVT-AV1, AOM) birlikte. Konteyner, çözünürlük sınırı, kare hızı ve bit hızı seçin — ya da Otomatik'in bilgisayarınızdaki en iyi seçeneği bulmasına izin verin.",
+        placeholder: "Ayarlar → Kayıt Kalitesi: kodlayıcı, konteyner, çözünürlük ve bit hızı kontrolleri",
+      },
+      {
+        title: "Yerelde kaydetmek yerine YouTube'a yayınlayın",
+        desc: "Bir oturumu doğrudan özel, liste dışı veya herkese açık bir yayın olarak, özel bir başlık şablonuyla YouTube'a gönderin. Yayın bittiğinde YouTube onu kendiliğinden normal bir videoya çevirir, böylece yerel diskte ekstra yer kaplamaz.",
+        placeholder: "Ayarlar → YouTube Yayını: başlık şablonu, gizlilik ve yayın kalitesi seçenekleri",
+      },
+      {
+        title: "Kayıtlarınız, kendi Drive'ınızda",
+        desc: "Arka planda çalışan bir izleyici yeni kayıtları kendiliğinden yükler, kuyruk yeniden başlatmadan sonra da devam eder. Tam çift yönlü senkronizasyon, yerel öncelikli (sadece yükleme, gerisini Drive'dan görüntüleme) veya manuel modlardan seçin.",
+        note: "Capcove, Drive'a ve YouTube'a bilgisayarınızdan doğrudan bağlanır — arada bir Capcove sunucusu yoktur. OAuth token'ları işletim sisteminizin kimlik bilgisi deposunda kalır, başka hiçbir yere gönderilmez.",
+        placeholder: "Ayarlar → Google Drive: bağlı hesap ve senkronizasyon modu",
+      },
+      {
+        title: "Tek galeri, her kayıt",
+        desc: "Yerel ve Drive kayıtları tek bir görünümde, oyuna ve klasöre göre gruplandırılmış. Etiketleyin, favorilere ekleyin ve filtreleyin, sonra bulut kopyasını kaybetmeden yerel disk alanı açın.",
+        placeholder: "Galeri penceresi: oyuna ve klasöre göre gruplanmış kayıtlar, etiketler ve favoriler görünür",
+      },
+    ],
+  },
+  shortcuts: {
+    title: "Kısayollar",
+    desc: "Bunlar varsayılan olarak gelir — her kombinasyon ve aksiyon düzenlenebilir; Ayarlar'dan istediğiniz kadar ek slot ekleyebilirsiniz.",
+    rows: [
+      { keys: ["F8"], action: "Anı Kaydet", result: "Çalışan Instant Replay tamponundan son birkaç dakikayı kaydeder" },
+      { keys: ["Alt", "F2"], action: "Çarkı Aç", result: "Her yakalama aksiyonu için radyal menüyü açar" },
+    ],
+  },
+  download: {
+    title: "İndir",
+    latestRelease: (name) => `Son sürüm: ${name}`,
+    noRelease: "Henüz yayınlanmış bir sürüm yok — derleme talimatları için GitHub deposuna bakın.",
+    notAvailable: "Henüz mevcut değil",
+    viewAll: "GitHub'da tüm sürümleri görüntüle →",
+    msStore: "Microsoft Store'dan edinin",
+    platforms: {
+      windows: { label: "Windows", note: "10 / 11 · x64 ve ARM64" },
+      macos: { label: "macOS", note: "Universal · Apple Silicon ve Intel" },
+      linux: { label: "Linux", note: "deb · rpm · AppImage" },
+    },
+  },
+  changelog: {
+    title: "Güncelleme geçmişi",
+    desc: "Hangi sürümde ne geldi.",
+    viewRelease: "Sürümü görüntüle →",
+  },
+  footer: {
+    rights: (year) => `© ${year} Capcove · MIT Lisansı`,
+    madeBy: "Geliştirici:",
+    github: "GitHub",
+    issues: "Sorunlar",
+    license: "Lisans",
+    privacy: "Gizlilik",
+    terms: "Koşullar",
+  },
+};

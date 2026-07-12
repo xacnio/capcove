@@ -1,0 +1,254 @@
+name: 'Build & Release'
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Step 0: Check if we should release
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      is_new_version: ${{ steps.check.outputs.is_new }}
+      new_tag: ${{ steps.check.outputs.tag }}
+      should_release: ${{ steps.check.outputs.should_release }}
+      changelog: ${{ steps.changelog.outputs.changelog }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check version
+        id: check
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="v$VERSION"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "is_new=false" >> $GITHUB_OUTPUT
+            echo "should_release=false" >> $GITHUB_OUTPUT
+            # Append short sha to ensure tauri-action still generates artifacts
+            SHA_SHORT=$(git rev-parse --short HEAD)
+            echo "tag=${TAG}-dev-${SHA_SHORT}" >> $GITHUB_OUTPUT
+          else
+            echo "is_new=true" >> $GITHUB_OUTPUT
+            echo "should_release=true" >> $GITHUB_OUTPUT
+            echo "tag=$TAG" >> $GITHUB_OUTPUT
+            echo "New version $VERSION detected and release requested."
+          fi
+      - name: Generate changelog
+        id: changelog
+        shell: bash
+        run: |
+          REPO_URL="https://github.com/${{ github.repository }}"
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -z "$PREVIOUS_TAG" ]; then
+            CHANGELOG=$(git log --pretty=format:"- %s ([%h](${REPO_URL}/commit/%H))" -n 20)
+          else
+            CHANGELOG=$(git log --pretty=format:"- %s ([%h](${REPO_URL}/commit/%H))" ${PREVIOUS_TAG}..HEAD)
+          fi
+          echo "changelog<<CHANGELOG_EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "CHANGELOG_EOF" >> $GITHUB_OUTPUT
+
+  # Step 1: Build frontend once
+  build-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: npm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            npm-${{ runner.os }}-
+      - name: Install dependencies
+        run: npm ci
+      - name: Build frontend
+        run: npm run build
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: dist/
+          retention-days: 1
+
+  # Step 2: Build native binaries
+  build-tauri:
+    needs: [check-version, build-frontend]
+    runs-on: ${{ matrix.platform }}
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: 'windows-latest'
+            args: '--target x86_64-pc-windows-msvc'
+            rust-targets: 'x86_64-pc-windows-msvc'
+            cache-key: 'win-x64'
+
+          - platform: 'windows-latest'
+            args: '--target aarch64-pc-windows-msvc'
+            rust-targets: 'aarch64-pc-windows-msvc'
+            cache-key: 'win-arm64'
+
+          # macOS and Linux builds are disabled for now — Windows only.
+
+    steps:
+      - uses: actions/checkout@v4
+      # ffmpeg/ffprobe are ~137MB each — over GitHub's 100MB per-file push
+      # limit, so they're NOT committed to this repo (see .gitignore).
+      # Pinned to a specific dated BtbN/FFmpeg-Builds release (not the
+      # rolling `latest` tag, which gets its assets overwritten in place —
+      # a pin against that would silently drift): both the zip and the
+      # extracted exe are hash-verified, against BtbN's own published
+      # checksums.sha256 and the pins in `src-tauri/src/integrity.rs`
+      # respectively. Bump the tag/build-id/hashes here (both spots) and in
+      # integrity.rs together when upgrading this.
+      - name: Download ffmpeg/ffprobe sidecars
+        shell: bash
+        run: |
+          mkdir -p src-tauri/binaries
+          TAG=autobuild-2026-07-12-13-16
+          BUILD=N-125551-ga09be9b91e
+          case "${{ matrix.rust-targets }}" in
+            x86_64-pc-windows-msvc)
+              ARCH_NAME=win64
+              ZIP_SHA256=b6caec1787d2083be5a6755adb7b650bc23e9fef954742608a241b2d87a0af2d
+              FFMPEG_SHA256=b6e37c0e4bf1c18bd019e8926c5809ecf734249bd48c227efacf019bd6528b92
+              FFPROBE_SHA256=fa86ff8d675b24b31979d65da1f569a9f0418e69db184ec6688f3c6d7f9ffa14
+              ;;
+            aarch64-pc-windows-msvc)
+              ARCH_NAME=winarm64
+              ZIP_SHA256=340c9361a286824839b25ece701389d8d4d94c01b0c4f85016f482ecae2456eb
+              FFMPEG_SHA256=dcb8e91a5dc0ed2cd29e8a4bf33fc5cf074996094818b0acc1bb2616b52381f9
+              FFPROBE_SHA256=0fdb93d7771e8db63ddc0469cf4e151e53a0ffb9f2dfe1e50a9654da6fa5d680
+              ;;
+            *)
+              echo "::error::No pinned ffmpeg/ffprobe build for target ${{ matrix.rust-targets }} yet — add one (BtbN publish native builds for this target) and update this step + integrity.rs."
+              exit 1
+              ;;
+          esac
+          ZIP_NAME="ffmpeg-$BUILD-$ARCH_NAME-gpl.zip"
+          curl -fL "https://github.com/BtbN/FFmpeg-Builds/releases/download/$TAG/$ZIP_NAME" -o ffmpeg.zip
+          echo "$ZIP_SHA256  ffmpeg.zip" | sha256sum -c -
+          7z x ffmpeg.zip -offmpeg_extract -y >/dev/null
+          BIN_DIR=$(dirname "$(find ffmpeg_extract -iname ffmpeg.exe)")
+          cp "$BIN_DIR/ffmpeg.exe" "src-tauri/binaries/ffmpeg-${{ matrix.rust-targets }}.exe"
+          cp "$BIN_DIR/ffprobe.exe" "src-tauri/binaries/ffprobe-${{ matrix.rust-targets }}.exe"
+          echo "$FFMPEG_SHA256  src-tauri/binaries/ffmpeg-${{ matrix.rust-targets }}.exe" | sha256sum -c -
+          echo "$FFPROBE_SHA256  src-tauri/binaries/ffprobe-${{ matrix.rust-targets }}.exe" | sha256sum -c -
+          rm -rf ffmpeg.zip ffmpeg_extract
+      - name: Download frontend
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: dist/
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust-targets }}
+      - name: Set up sccache
+        uses: mozilla-actions/sccache-action@v0.0.7
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+          shared-key: ${{ matrix.cache-key }}-${{ hashFiles('package.json') }}
+          # sccache already caches compiled objects; caching the whole target/
+          # dir here too would just double up on the repo's 10GB cache quota.
+          cache-targets: false
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: npm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            npm-${{ runner.os }}-
+      - name: Install npm deps
+        run: npm ci
+
+      - name: Skip frontend build
+        run: node -e "const f='src-tauri/tauri.conf.json';const j=JSON.parse(require('fs').readFileSync(f,'utf8'));j.build.beforeBuildCommand='';require('fs').writeFileSync(f,JSON.stringify(j,null,4))"
+
+      - name: Build and Release
+        uses: tauri-apps/tauri-action@v0.6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+        with:
+          tagName: ${{ needs.check-version.outputs.new_tag }}
+          releaseName: "Capcove ${{ needs.check-version.outputs.new_tag }}"
+          releaseBody: ${{ needs.check-version.outputs.changelog }}
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.args }}
+          includeRelease: ${{ needs.check-version.outputs.should_release == 'true' }}
+
+      - name: Upload Artifacts (if not releasing)
+        if: needs.check-version.outputs.should_release != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: capcove-bins-${{ matrix.platform }}-${{ matrix.cache-key }}
+          path: |
+            src-tauri/target/**/release/bundle/msi/*.msi
+            src-tauri/target/**/release/bundle/nsis/*.exe
+          if-no-files-found: warn
+
+  # Step 3: Finalize
+  finalize-release:
+    if: needs.check-version.outputs.should_release == 'true'
+    needs: [check-version, build-tauri]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Update Release Description
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CHANGELOG: ${{ needs.check-version.outputs.changelog }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="v$VERSION"
+          BASE="https://github.com/${{ github.repository }}/releases/download/${TAG}"
+
+          cat > /tmp/release_body.md << 'HEREDOC'
+          ### 📦 Download Links
+
+          | Architecture | Windows |
+          | :--- | :--- |
+          HEREDOC
+
+          echo "| **x86-64 (64-bit)** | [EXE](${BASE}/Capcove_${VERSION}_x64-setup.exe) · [MSI](${BASE}/Capcove_${VERSION}_x64_en-US.msi) |" >> /tmp/release_body.md
+          echo "| **ARM64** | [EXE](${BASE}/Capcove_${VERSION}_arm64-setup.exe) |" >> /tmp/release_body.md
+          echo "" >> /tmp/release_body.md
+          echo "Or get it from the Microsoft Store:" >> /tmp/release_body.md
+          echo "" >> /tmp/release_body.md
+          echo '<a href="https://apps.microsoft.com/detail/9NXZDV6V9HRX?launch=true&mode=full" target="_blank"><img src="https://get.microsoft.com/images/en-us%20dark.svg" width="180" alt="Get it from Microsoft Store" /></a>' >> /tmp/release_body.md
+          echo "" >> /tmp/release_body.md
+          echo "### 📝 What's New" >> /tmp/release_body.md
+          echo "$CHANGELOG" >> /tmp/release_body.md
+          echo "" >> /tmp/release_body.md
+          echo "---" >> /tmp/release_body.md
+          echo "*Automatically generated by CI*" >> /tmp/release_body.md
+
+          gh release edit "$TAG" --notes-file /tmp/release_body.md

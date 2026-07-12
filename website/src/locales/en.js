@@ -1,0 +1,95 @@
+export default {
+  scrollToTop: "Scroll to top",
+  nav: { features: "Features", download: "Download", changelog: "Changelog" },
+  header: { download: "Download" },
+  hero: {
+    titleLine1: "Record, replay, share.",
+    titleLine2: "Always on, unseen.",
+    desc: "Capcove is a screen & game recorder that lives in your tray. Record a window, monitor, or area, keep an Instant Replay buffer running, and stream to YouTube — recordings sync to Google Drive on their own.",
+    downloadFor: (platform) => `Download for ${platform}`,
+    otherPlatforms: "Other platforms",
+    otherArch: "Choose a different architecture",
+    license: "Free and open source · MIT licensed",
+    screenshotAlt: "Capcove's radial Wheel HUD, mid capture session",
+    screenshotPlaceholder: "Wheel overlay: Save Replay action highlighted, with a live 'currently playing' game card",
+  },
+  platform: { windows: "Windows", macos: "macOS", linux: "Linux" },
+  features: {
+    title: "Everything you need, nothing you don't",
+    desc: "Capcove is built to disappear into your workflow — recording stays lightweight, sync and streaming happen in the background.",
+    placeholderLabel: "Screenshot placeholder",
+    items: [
+      {
+        title: "Instant Replay, always running",
+        desc: "A rolling buffer keeps the last few minutes ready to save on demand, with no re-encode — and starts automatically the moment a detected game launches. The wheel, HUD, and toast notifications stay invisible to any other capture or streaming software running at the same time.",
+        placeholder: "Wheel overlay: Save Replay action highlighted, with a live 'currently playing' game card",
+      },
+      {
+        title: "Record a window, a monitor, or just an area",
+        desc: "Drag out a region and Capcove records exactly that, with a floating control bar you can move out of the way — nothing about the frame or bar ends up in the recording itself. Capcove itself stays tray-resident between recordings, with optional autostart and elevated/admin mode.",
+        placeholder: "Floating area-recorder control bar and dashed selection frame over the gallery",
+      },
+      {
+        title: "Trim without leaving the player",
+        desc: "Drag the start and end handles right on the timeline, hold still to zoom in for frame-accurate cuts, and save the result as a clip next to the original — or open Advanced Export to pick a resolution, encoder, and bitrate first.",
+        placeholder: "Video player's trim tool: drag handles, waveform, Save Clip and Advanced Export controls",
+      },
+      {
+        title: "Hardware encoding, your way",
+        desc: "NVIDIA NVENC, AMD AMF, and Intel QSV in H.264, HEVC, or AV1, with software fallbacks (x264, x265, SVT-AV1, AOM) if you'd rather not touch the GPU. Pick a container, resolution cap, frame rate, and bitrate — or let Auto choose the best option on your machine.",
+        placeholder: "Settings → Recording Quality: encoder, container, resolution and bitrate controls",
+      },
+      {
+        title: "Stream to YouTube instead of recording locally",
+        desc: "Send a session straight to YouTube as a private, unlisted, or public broadcast, with a custom title template. Once it ends, YouTube turns it into a regular video on its own, so nothing extra sits on local disk.",
+        placeholder: "Settings → YouTube Streaming: title template, visibility and stream quality options",
+      },
+      {
+        title: "Your recordings, your Drive",
+        desc: "A background watcher uploads new recordings on its own, and the queue survives a restart. Choose full two-way sync, local-priority (upload only, browse the rest from Drive), or manual.",
+        note: "Capcove talks to Drive and YouTube directly from your machine — there's no Capcove server in between. OAuth tokens live in your OS credential store, not anywhere else.",
+        placeholder: "Settings → Google Drive: connected account and sync mode",
+      },
+      {
+        title: "One gallery, every recording",
+        desc: "Local and Drive recordings in a single view, grouped by game and folder. Tag, favorite, and filter, then free up local disk space without losing the cloud copy.",
+        placeholder: "Gallery window: recordings grouped by game and folder, with tags and favorites",
+      },
+    ],
+  },
+  shortcuts: {
+    title: "Shortcuts",
+    desc: "These ship by default — every combo and action is editable, and you can add as many extra slots as you need from Settings.",
+    rows: [
+      { keys: ["F8"], action: "Save Replay", result: "Saves the last few minutes from the running Instant Replay buffer" },
+      { keys: ["Alt", "F2"], action: "Open Wheel", result: "Opens the radial menu for every capture action" },
+    ],
+  },
+  download: {
+    title: "Download",
+    latestRelease: (name) => `Latest release: ${name}`,
+    noRelease: "No published release yet — check the GitHub repository for build instructions.",
+    notAvailable: "Not available yet",
+    viewAll: "View all releases on GitHub →",
+    msStore: "Get it from Microsoft Store",
+    platforms: {
+      windows: { label: "Windows", note: "10 / 11 · x64 & ARM64" },
+      macos: { label: "macOS", note: "Universal · Apple Silicon & Intel" },
+      linux: { label: "Linux", note: "deb · rpm · AppImage" },
+    },
+  },
+  changelog: {
+    title: "Update history",
+    desc: "What shipped, release by release.",
+    viewRelease: "View release →",
+  },
+  footer: {
+    rights: (year) => `© ${year} Capcove · MIT License`,
+    madeBy: "Made by",
+    github: "GitHub",
+    issues: "Issues",
+    license: "License",
+    privacy: "Privacy",
+    terms: "Terms",
+  },
+};

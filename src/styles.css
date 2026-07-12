@@ -1,0 +1,269 @@
+@import "tailwindcss";
+@import "@fontsource-variable/manrope";
+
+@theme {
+  /* Font */
+  --font-sans: 'Manrope Variable', 'Manrope', system-ui, sans-serif;
+
+  /* Electric cyan accent (fixed) */
+  --color-accent-200: #a5f3fc;
+  --color-accent-300: #67e8f9;
+  --color-accent-400: #22d3ee;
+  --color-accent-500: #06b6d4;
+  --color-accent-600: #0891b2;
+  --color-accent-700: #0e7490;
+  --color-accent-800: #155e75;
+  --color-accent-900: #164e63;
+
+  /* Stone → neutral dark */
+  /* stone-* classes are used across all components;
+     overriding here means no JSX file needs to be touched.               */
+  --color-stone-950: #0f0f0f;
+  --color-stone-900: #161616;
+  --color-stone-800: #222222;
+  --color-stone-700: #2d2d2d;
+  --color-stone-600: #3d3d3d;
+  --color-stone-500: #666666;
+  --color-stone-400: #999999;
+  --color-stone-300: #c8c8c8;
+  --color-stone-200: #e3e3e3;
+  --color-stone-100: #f5f5f5;
+  --color-stone-50:  #fafafa;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+/* See src/lib/platform.js. */
+.is-macos, .is-macos * {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: #0f0f0f;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* macOS: the window itself is made transparent (no native decorations), so
+   we round + clip the content here to fake the native window corner radius.
+   `body`'s own background must be clipped too — WebKit propagates a body
+   background to the canvas, which ignores `html`'s overflow/radius clip. */
+html.platform-mac,
+html.platform-mac body {
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+/* Scrollbar — thin, neutral */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2d2d2d transparent;
+}
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-thumb {
+  background: #2d2d2d;
+  border-radius: 9999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: #3d3d3d;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.no-scrollbar {
+  scrollbar-width: none !important;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+}
+
+/* Video card view-mode density (data-vm from VideoGrid.jsx) — "medium" and
+   narrower are too tight for the full app-icon + wrapped-meta info panel
+   (the icon alone eats ~40% of a 170px-wide card), so they collapse to a
+   title-only strip instead. "large"/"xl"/"2xl" keep the rich panel (size,
+   date+time, folder). */
+[data-vm="small"] .vc-info,
+[data-vm="medium"] .vc-info {
+  height: 44px;
+  padding: 6px 10px;
+}
+[data-vm="small"] .vc-appicon,
+[data-vm="medium"] .vc-appicon,
+[data-vm="small"] .vc-meta,
+[data-vm="medium"] .vc-meta {
+  display: none;
+}
+[data-vm="small"] .vc-title,
+[data-vm="medium"] .vc-title {
+  font-size: 11px;
+}
+
+/* Allow text selection in form elements */
+input,
+textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Gallery card view modes (managed via data-vm from CSS) */
+/* gc has no aspect-ratio — card height is the natural sum of image + info */
+
+.gc-img              { aspect-ratio: 16 / 10; width: 100%; }
+[data-vm="2xl"] .gc-img { aspect-ratio: 16 / 9; }
+
+.gc-info              { padding: 8px 10px 10px; }
+[data-vm="small"] .gc-info { padding: 4px 6px 6px; }
+
+.gc-title              { font-size: 12px; line-height: 1.4; }
+[data-vm="small"] .gc-title { font-size: 10px; }
+
+.gc-date               { margin-top: 3px; font-size: 10px; }
+[data-vm="small"] .gc-date  { margin-top: 2px; font-size: 9px; }
+
+.gc-filename           { display: block; }
+[data-vm="small"] .gc-filename { display: none; }
+
+.gc-app                { display: flex; margin-top: 4px; }
+[data-vm="small"] .gc-app  { display: none; margin-top: 0; }
+
+/* Loading scan animation */
+@keyframes scan {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(350%); }
+}
+
+/* Gallery skeleton cards: a soft highlight band sweeping left-to-right
+   over a flat placeholder, standard "shimmer" skeleton-loading treatment. */
+@keyframes shimmer {
+  0%   { background-position: -468px 0; }
+  100% { background-position: 468px 0; }
+}
+
+.skeleton-shimmer {
+  background-color: rgba(255, 255, 255, 0.04);
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0,
+    rgba(255, 255, 255, 0.05) 20%,
+    rgba(255, 255, 255, 0.09) 40%,
+    rgba(255, 255, 255, 0) 60%
+  );
+  background-repeat: no-repeat;
+  background-size: 468px 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+/* Gallery main: wider scrollbar with minimum thumb size */
+.gallery-main {
+  scrollbar-width: thin;
+  scrollbar-color: #3d3d3d transparent;
+}
+.gallery-main::-webkit-scrollbar { width: 8px; }
+.gallery-main::-webkit-scrollbar-thumb {
+  background: #3d3d3d;
+  border-radius: 4px;
+  min-height: 48px;
+}
+.gallery-main::-webkit-scrollbar-thumb:hover { background: #666666; }
+.gallery-main::-webkit-scrollbar-track { background: transparent; }
+
+/* Canvas crisp rendering */
+canvas {
+  image-rendering: -moz-crisp-edges;
+  image-rendering: -webkit-crisp-edges;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* Smooth Fade In */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes fadeInSimple {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.animate-fade-in-simple {
+  animation: fadeInSimple 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Sidebar nav item entrance */
+@keyframes slideInItem {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-sidebar-item {
+  animation: slideInItem 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Panel slide-up (transfer panel, popovers) */
+@keyframes slideUpIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-panel-in {
+  animation: slideUpIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(10px) scale(0.96); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0)     scale(1);    }
+}
+.animate-toast-in {
+  animation: toastIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* "Show in Folder View" landing card: a couple of soft accent-colored rings
+   pulsing outward, so the card that was just jumped to is unmistakable
+   without leaving any permanent ring/border behind once it settles. */
+@keyframes highlightFlash {
+  0%   { box-shadow: 0 0 0 0 rgba(34, 211, 238, 0); }
+  8%   { box-shadow: 0 0 0 5px rgba(34, 211, 238, 0.55); }
+  28%  { box-shadow: 0 0 0 0 rgba(34, 211, 238, 0); }
+  40%  { box-shadow: 0 0 0 5px rgba(34, 211, 238, 0.4); }
+  60%, 100% { box-shadow: 0 0 0 0 rgba(34, 211, 238, 0); }
+}
+.animate-highlight-flash {
+  animation: highlightFlash 1.5s ease-out;
+}
+
