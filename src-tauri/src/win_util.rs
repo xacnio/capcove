@@ -58,6 +58,27 @@ pub fn bring_window_to_foreground(hwnd_u32: u32) {
 #[cfg(not(windows))]
 pub fn bring_window_to_foreground(_hwnd_u32: u32) {}
 
+/// Waits up to `timeout_ms` for a process to exit on its own; force-kills it
+/// if it hasn't. Safety net for ffmpeg's graceful stdin-close stop.
+#[cfg(windows)]
+pub fn wait_or_kill_process(pid: u32, timeout_ms: u32) {
+    use windows::Win32::Foundation::{CloseHandle, WAIT_OBJECT_0};
+    use windows::Win32::System::Threading::{OpenProcess, TerminateProcess, WaitForSingleObject, PROCESS_ACCESS_RIGHTS, PROCESS_TERMINATE};
+
+    const SYNCHRONIZE: PROCESS_ACCESS_RIGHTS = PROCESS_ACCESS_RIGHTS(0x0010_0000);
+    unsafe {
+        let Ok(handle) = OpenProcess(PROCESS_TERMINATE | SYNCHRONIZE, false, pid) else { return };
+        if WaitForSingleObject(handle, timeout_ms) != WAIT_OBJECT_0 {
+            log::warn!("process {pid} didn't exit within {timeout_ms}ms of a graceful stop — force-killing it");
+            let _ = TerminateProcess(handle, 1);
+        }
+        let _ = CloseHandle(handle);
+    }
+}
+
+#[cfg(not(windows))]
+pub fn wait_or_kill_process(_pid: u32, _timeout_ms: u32) {}
+
 /// Sets whole-window opacity (0-255) via a layered-window attribute. Needs
 /// `WS_EX_LAYERED` set once before `SetLayeredWindowAttributes` takes effect.
 #[cfg(windows)]

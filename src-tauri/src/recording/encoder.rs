@@ -353,8 +353,15 @@ impl EncodeJob {
     }
 
     /// Closes ffmpeg's stdin (EOF) — the graceful-stop path, not a kill.
-    pub fn finish(self) {
+    /// `allow_kill`: only the live job may be force-killed past a grace
+    /// period (no file at risk); local waits indefinitely to avoid writing
+    /// a corrupt recording.
+    pub fn finish(self, allow_kill: bool) {
+        let pid = self.child.pid();
         drop(self.child);
+        if allow_kill {
+            crate::win_util::wait_or_kill_process(pid, 15_000);
+        }
     }
 }
 
@@ -375,6 +382,8 @@ impl JobFeeder {
         // A couple of frames of slack — absorbs a brief hiccup without
         // becoming a stale-frame latency buffer once the job falls behind.
         let (tx, rx) = std::sync::mpsc::sync_channel::<Arc<[u8]>>(2);
+        // Only the live job's stop may force-kill (see `EncodeJob::finish`).
+        let allow_kill = kind == "live stream";
         let thread = std::thread::spawn(move || {
             while let Ok(frame) = rx.recv() {
                 if let Err(e) = job.write_frame(&frame) {
@@ -382,7 +391,7 @@ impl JobFeeder {
                     break;
                 }
             }
-            job.finish();
+            job.finish(allow_kill);
         });
         Self { tx: Some(tx), thread: Some(thread) }
     }

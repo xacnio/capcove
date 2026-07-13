@@ -617,15 +617,18 @@ fn spawn_writer_thread(
                 match msg {
                     WriterControl::EnableLocal(path) => pending_local = Some(path),
                     WriterControl::DisableLocal => {
+                        // Off its own thread — `.stop()` can now block a
+                        // while (see `EncodeJob::finish`), and blocking this
+                        // loop would stall the other job too.
                         if let Some(j) = local_job.take() {
-                            j.stop();
+                            std::thread::spawn(move || j.stop());
                         }
                         pending_local = None;
                     }
                     WriterControl::EnableLive(params) => pending_live = Some(*params),
                     WriterControl::DisableLive => {
                         if let Some(j) = live_job.take() {
-                            j.stop();
+                            std::thread::spawn(move || j.stop());
                         }
                         pending_live = None;
                     }
@@ -788,19 +791,21 @@ fn spawn_writer_thread(
                 }
             }
         }
-        // Disconnect both before joining either, so neither job's catch-up
-        // time serializes behind the other's.
+        // Disconnect both first, then stop both concurrently so neither's
+        // (now potentially slow) stop serializes behind the other's.
         if let Some(j) = local_job.as_mut() {
             j.disconnect();
         }
         if let Some(j) = live_job.as_mut() {
             j.disconnect();
         }
-        if let Some(j) = local_job.take() {
-            j.stop();
+        let local_stop = local_job.take().map(|j| std::thread::spawn(move || j.stop()));
+        let live_stop = live_job.take().map(|j| std::thread::spawn(move || j.stop()));
+        if let Some(t) = local_stop {
+            let _ = t.join();
         }
-        if let Some(j) = live_job.take() {
-            j.stop();
+        if let Some(t) = live_stop {
+            let _ = t.join();
         }
     })
 }
@@ -837,15 +842,32 @@ fn bgra_to_jpeg(bgra: &[u8], width: u32, height: u32) -> Option<Vec<u8>> {
     Some(out)
 }
 
-/// Stops the session only if it's still the same one this job belonged to —
-/// a stale watcher must never tear down an unrelated new session.
-async fn stop_if_still_current(app: &AppHandle, session_id: &str) {
+/// Stops the session only if it's still the same one this job belonged to.
+/// Returns whether it was — callers use that to tell a genuine crash apart
+/// from ffmpeg exiting as part of a stop the app already initiated.
+async fn stop_if_still_current(app: &AppHandle, session_id: &str) -> bool {
     let current = app.state::<Arc<RecordingManager>>().current_session();
-    if current.map(|s| s.id) == Some(session_id.to_string()) {
+    let still_current = current.map(|s| s.id) == Some(session_id.to_string());
+    if still_current {
         log::warn!("ffmpeg exited unexpectedly while its session was still active — stopping the session");
         let app2 = app.clone();
         let _ = tauri::async_runtime::spawn_blocking(move || stop_recording(&app2)).await;
     }
+    still_current
+}
+
+/// Live-specific version of `stop_if_still_current`: the session can stay
+/// current (local recording keeps going) after `live` is intentionally
+/// turned off, so this checks `session.live` itself, not just the session id.
+async fn stop_if_live_still_expected(app: &AppHandle, session_id: &str) -> bool {
+    let current = app.state::<Arc<RecordingManager>>().current_session();
+    let live_still_expected = current.as_ref().is_some_and(|s| s.id == session_id && s.live);
+    if live_still_expected {
+        log::warn!("ffmpeg[live] exited unexpectedly while streaming was still active — stopping the session");
+        let app2 = app.clone();
+        let _ = tauri::async_runtime::spawn_blocking(move || stop_recording(&app2)).await;
+    }
+    live_still_expected
 }
 
 /// One completed ffmpeg `-progress` report: the windowed bitrate (`None` for
@@ -1051,10 +1073,11 @@ fn spawn_local_finish_watcher(app: AppHandle, mut rx: tauri::async_runtime::Rece
         let file_name = relative_video_name(&app, &output_path);
 
         if exit_code != Some(0) {
-            // ffmpeg died mid-session (a graceful finish always exits 0) —
-            // tear down the session if it's still the active one.
-            stop_if_still_current(&app, &session_id).await;
-            crate::notify_error(&app, "Recording failed — the encoder exited with an error");
+            // Non-zero can also mean an intentional force-killed stop, not a
+            // crash — only report it if the session was genuinely still active.
+            if stop_if_still_current(&app, &session_id).await {
+                crate::notify_error(&app, "Recording failed — the encoder exited with an error");
+            }
             // Drop a zero-byte leftover and its orphaned metadata entry.
             if std::fs::metadata(&output_path).map(|m| m.len() == 0).unwrap_or(false) {
                 let _ = std::fs::remove_file(&output_path);
@@ -1101,8 +1124,12 @@ fn spawn_live_finish_watcher(app: AppHandle, mut rx: tauri::async_runtime::Recei
             }
         }
         if exit_code != Some(0) {
-            stop_if_still_current(&app, &session_id).await;
-            crate::notify_error(&app, "Streaming stopped unexpectedly");
+            // Same reasoning — plus a plain "stop stream, keep recording"
+            // toggle leaves the session current too. Only alarm if `live`
+            // was still expected to be running.
+            if stop_if_live_still_expected(&app, &session_id).await {
+                crate::notify_error(&app, "Streaming stopped unexpectedly");
+            }
         }
     });
 }
