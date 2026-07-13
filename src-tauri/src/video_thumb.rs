@@ -758,6 +758,11 @@ fn waveform_cache_dir(app: &AppHandle) -> Option<PathBuf> {
 /// `mix-blend-mode: screen` to fake an alpha channel.
 pub(crate) async fn ensure_waveform_cached(app: &AppHandle, name: &str) -> Result<PathBuf, String> {
     let source = app.state::<Arc<ConfigStore>>().get().resolved_recordings_dir().join(name);
+    // A still-growing recording has no valid trailer/index — ffmpeg can hang
+    // reading it instead of erroring out.
+    if app.state::<Arc<crate::recording::RecordingManager>>().is_recording_path(&source) {
+        return Err("recording still in progress".into());
+    }
     let Some(cache_dir) = waveform_cache_dir(app) else { return Err("no cache dir".into()) };
     let cache_path = cache_dir.join(format!("{name}.png"));
     if cache_path.exists() {
@@ -814,6 +819,9 @@ pub async fn get_video_waveform_range(app: AppHandle, name: String, start_ms: u6
         return Err("End must be after start".into());
     }
     let source = app.state::<Arc<ConfigStore>>().get().resolved_recordings_dir().join(&name);
+    if app.state::<Arc<crate::recording::RecordingManager>>().is_recording_path(&source) {
+        return Err("recording still in progress".into());
+    }
     let start_s = start_ms as f64 / 1000.0;
     let duration_s = (end_ms - start_ms) as f64 / 1000.0;
     let nonce: u64 = rand::random();
@@ -872,6 +880,9 @@ fn parse_metadata_cache(s: &str) -> Option<VideoMetadata> {
 #[tauri::command]
 pub async fn get_video_metadata(app: AppHandle, config: State<'_, Arc<ConfigStore>>, name: String) -> Result<VideoMetadata, String> {
     let source = config.get().resolved_recordings_dir().join(&name);
+    if app.state::<Arc<crate::recording::RecordingManager>>().is_recording_path(&source) {
+        return Err("recording still in progress".into());
+    }
     let cache_path = thumb_cache_dir(&app).map(|d| d.join(format!("{name}.dur")));
 
     if let Some(c) = &cache_path {
@@ -951,6 +962,9 @@ fn parse_fraction(s: &str) -> Option<f64> {
 #[tauri::command]
 pub async fn get_video_details(app: AppHandle, config: State<'_, Arc<ConfigStore>>, name: String) -> Result<VideoProbeDetails, String> {
     let source = config.get().resolved_recordings_dir().join(&name);
+    if app.state::<Arc<crate::recording::RecordingManager>>().is_recording_path(&source) {
+        return Err("recording still in progress".into());
+    }
     let cmd = crate::integrity::ffprobe_sidecar(&app).map_err(|e| e.to_string())?;
     let output = cmd
         .args([

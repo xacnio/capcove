@@ -159,6 +159,15 @@ impl RecordingManager {
         })
     }
 
+    /// True if `path` is the local file an in-progress recording is writing
+    /// to (checked against both `output_path` and `current_local_path`) —
+    /// used to keep ffmpeg/ffprobe from touching a still-growing file.
+    pub fn is_recording_path(&self, path: &std::path::Path) -> bool {
+        self.active.lock().unwrap().as_ref().is_some_and(|a| {
+            a.session.output_path == path || a.session.current_local_path.as_deref() == Some(path)
+        })
+    }
+
     /// Pauses/resumes the active recording. Returns false when nothing is
     /// recording.
     pub fn set_paused(&self, paused: bool) -> bool {

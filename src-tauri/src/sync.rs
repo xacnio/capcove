@@ -728,6 +728,12 @@ fn is_file_ready(path: &Path) -> bool {
     false
 }
 
+/// `is_file_ready` alone isn't enough — ffmpeg doesn't lock its output file
+/// on Windows, so a still-recording file opens for write just fine too.
+fn is_active_recording_output(app: &AppHandle, path: &Path) -> bool {
+    app.state::<Arc<crate::recording::RecordingManager>>().is_recording_path(path)
+}
+
 /// Inspects files in the background, calculates their dates, saves to metadata.json, then enqueues for upload.
 /// `force` (propagated to `enqueue_files_batch`) also skips this function's own early-return so
 /// an explicit upload isn't silently dropped when Manual sync mode is on.
@@ -767,7 +773,7 @@ pub fn inspect_and_enqueue_background(app: AppHandle, paths: Vec<PathBuf>, force
         let mut missing_meta_paths = Vec::new();
         let dir = config.get().resolved_recordings_dir();
         for (name, path) in crate::video_thumb::list_video_files(&dir) {
-            if !is_file_ready(&path) { continue; }
+            if !is_file_ready(&path) || is_active_recording_output(&app, &path) { continue; }
             let has_created = meta_store.get(&name).and_then(|m| m.created).is_some();
             if !has_created {
                 missing_meta_paths.push((name, path));
@@ -824,7 +830,7 @@ pub fn inspect_and_enqueue_background(app: AppHandle, paths: Vec<PathBuf>, force
             let pending = engine.pending.lock().unwrap();
             for path in paths {
                 if !path.is_file() || !is_image(&path) { continue; }
-                if !is_file_ready(&path) { continue; }
+                if !is_file_ready(&path) || is_active_recording_output(&app, &path) { continue; }
                 let name = crate::recording::relative_video_name(&app, &path);
                 if name.is_empty() { continue; }
                 let drive_name = crate::drive::sanitize_filename(&name);
