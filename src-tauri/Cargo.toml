@@ -1,6 +1,6 @@
 [package]
 name = "capcove"
-version = "1.0.0"
+version = "1.0.1"
 description = "Screen capture and video recording tool with Google Drive sync"
 authors = ["Alperen Cetin <me@xacnio.dev>"]
 license = "MIT"
