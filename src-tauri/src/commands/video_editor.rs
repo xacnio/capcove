@@ -661,13 +661,14 @@ pub async fn upload_video_to_youtube(
         .await
         .map_err(|e| e.to_string())?;
 
-    // Stamp the local file so the gallery card can link straight to the
-    // upload instead of just offering "Upload to YouTube" again.
-    if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
+    // Full relative name, not just the bare file name — `MetaStore` keys by
+    // that, so a video inside a subfolder was stamping the wrong entry.
+    let file_name = recording::relative_video_name(&app, &path);
+    if !file_name.is_empty() {
         let meta_store = app.state::<Arc<crate::meta::MetaStore>>();
-        let mut m = meta_store.get(file_name).unwrap_or_default();
+        let mut m = meta_store.get(&file_name).unwrap_or_default();
         m.youtube_video_id = Some(video_id.clone());
-        meta_store.set(file_name.to_string(), m);
+        meta_store.set(file_name.clone(), m);
         let _ = app.emit("video-saved", serde_json::json!({ "name": file_name }));
     }
 
