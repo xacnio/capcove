@@ -3,8 +3,20 @@
   <head>
     <meta charset="UTF-8" />
     <title>Capcove - Wheel</title>
+    <style>
+      /* Without this, `100vw`/`100vh` content inside #root (see App.jsx)
+         can end up a hair taller/wider than the actual viewport — box-sizing
+         and default html/body margins aren't otherwise accounted for — and
+         `html` (not just `body`) needs its own overflow:hidden, since it's
+         the actual scrolling box the browser scrollbars attach to. */
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0; padding: 0; width: 100vw; height: 100vh;
+        overflow: hidden; background: transparent;
+      }
+    </style>
   </head>
-  <body style="background: transparent; margin: 0; overflow: hidden;">
+  <body>
     <div id="root"></div>
     <script type="module" src="/src/wheel/main.jsx"></script>
   </body>
