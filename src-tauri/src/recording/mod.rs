@@ -1156,6 +1156,12 @@ async fn prepare(app: &AppHandle, game_name: Option<&str>, game_pid: Option<u32>
     if manager.is_recording() {
         return Err("A recording is already in progress".into());
     }
+    // One-time (Windows remembers the answer) consent prompt so the OS can
+    // stop drawing its capture border — see `win_util::request_borderless_capture_access`.
+    static BORDERLESS_REQUESTED: std::sync::Once = std::sync::Once::new();
+    BORDERLESS_REQUESTED.call_once(|| {
+        let _ = tauri::async_runtime::spawn_blocking(crate::win_util::request_borderless_capture_access);
+    });
     // Atomically reserves the start slot — see `RecordingManager::starting`'s
     // doc comment for why the `is_recording()` check above isn't enough on
     // its own. Released automatically (even on an early `?` return below or

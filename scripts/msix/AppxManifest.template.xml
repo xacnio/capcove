@@ -35,6 +35,7 @@
 
     <Capabilities>
         <rescap:Capability Name="runFullTrust" />
+        <rescap:Capability Name="graphicsCaptureWithoutBorder" />
     </Capabilities>
 
     <Applications>

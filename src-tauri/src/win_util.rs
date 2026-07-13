@@ -79,6 +79,31 @@ pub fn wait_or_kill_process(pid: u32, timeout_ms: u32) {
 #[cfg(not(windows))]
 pub fn wait_or_kill_process(_pid: u32, _timeout_ms: u32) {}
 
+/// One-time consent prompt so Windows stops drawing the capture border.
+/// MSIX-only (needs the `graphicsCaptureWithoutBorder` capability); answer
+/// is remembered permanently, so later calls just return the cached result.
+#[cfg(windows)]
+pub fn request_borderless_capture_access() {
+    if !is_packaged() {
+        return;
+    }
+    use windows::Graphics::Capture::{GraphicsCaptureAccess, GraphicsCaptureAccessKind};
+    use windows::Security::Authorization::AppCapabilityAccess::AppCapabilityAccessStatus;
+    use windows::Win32::System::Com::{CoInitializeEx, COINIT_APARTMENTTHREADED};
+
+    unsafe { let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED); }
+    let result = GraphicsCaptureAccess::RequestAccessAsync(GraphicsCaptureAccessKind::Borderless)
+        .and_then(|op| op.get());
+    match result {
+        Ok(AppCapabilityAccessStatus::Allowed) => log::info!("borderless screen capture: granted"),
+        Ok(status) => log::info!("borderless screen capture: not granted (status {})", status.0),
+        Err(e) => log::warn!("borderless screen capture request failed: {e}"),
+    }
+}
+
+#[cfg(not(windows))]
+pub fn request_borderless_capture_access() {}
+
 /// Sets whole-window opacity (0-255) via a layered-window attribute. Needs
 /// `WS_EX_LAYERED` set once before `SetLayeredWindowAttributes` takes effect.
 #[cfg(windows)]
