@@ -303,7 +303,7 @@ export default {
       },
       captureCursor: "İmleci yakala",
       excludeOverlayWindows: "Overlay pencerelerini hariç tut",
-      excludeOverlayWindowsHint: "Sadece pencere kayıtlarında. Ayrı bir pencere olarak render olan overlay'leri kayıttan gizler (ör. Discord'un Shift+Tab paneli) — oyunun kendi render'ına hook'layan overlay'ler (çoğu oyun içi HUD bildirimi) bu yöntemle filtrelenemez.",
+      excludeOverlayWindowsHint: "Sadece pencere kayıtlarında. Ayrı bir pencere olarak render olan overlay'leri kayıttan gizler — oyunun kendi render'ına hook'layan overlay'ler (çoğu oyun içi HUD bildirimi) bu yöntemle filtrelenemez.",
       cropTitlebar: "Başlık çubuğunu kırp",
       cropTitlebarHint: "Sadece pencere kayıtlarında. Kaydın üstündeki OS başlık çubuğunu kırpar — borderless/tam ekran pencerelerde zaten başlık çubuğu olmadığı için bir etkisi olmaz.",
       minimizedBehavior: "Pencere minimize olduğunda",

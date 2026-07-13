@@ -303,7 +303,7 @@ export default {
       },
       captureCursor: "Capture cursor",
       excludeOverlayWindows: "Exclude overlay windows",
-      excludeOverlayWindowsHint: "Window recordings only. Hides overlays that render as their own separate window (e.g. Discord's Shift+Tab panel) — overlays hooked directly into the game's own rendering (most in-game HUD notifications) can't be filtered out this way.",
+      excludeOverlayWindowsHint: "Window recordings only. Hides overlays that render as their own separate window — overlays hooked directly into the game's own rendering (most in-game HUD notifications) can't be filtered out this way.",
       cropTitlebar: "Crop title bar",
       cropTitlebarHint: "Window recordings only. Crops the OS title bar off the top of the capture — has no effect on borderless/fullscreen windows, which don't have one.",
       minimizedBehavior: "When the window is minimized",
