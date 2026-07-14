@@ -135,6 +135,16 @@ impl GraphicsCaptureApiHandler for FrameSource {
 
 pub type CaptureHandle = windows_capture::capture::CaptureControl<FrameSource, BoxError>;
 
+/// `WithoutBorder` only when granted — otherwise it fails the capture session
+/// on a packaged build; `Default` always starts (see `borderless_capture_granted`).
+fn border_settings() -> DrawBorderSettings {
+    if crate::win_util::borderless_capture_granted() {
+        DrawBorderSettings::WithoutBorder
+    } else {
+        DrawBorderSettings::Default
+    }
+}
+
 /// Starts capturing `hwnd` on a dedicated thread. `fps` caps the update rate
 /// WGC will deliver frames at (it never delivers faster than the window
 /// actually redraws, so this is a ceiling, not a guarantee).
@@ -158,7 +168,7 @@ pub fn start_window_capture(
     let settings = Settings::new(
         window,
         cursor,
-        DrawBorderSettings::WithoutBorder,
+        border_settings(),
         secondary,
         MinimumUpdateIntervalSettings::Custom(Duration::from_millis(1000 / fps.max(1) as u64)),
         DirtyRegionSettings::Default,
@@ -186,7 +196,7 @@ pub fn start_monitor_capture(
     let settings = Settings::new(
         monitor,
         cursor,
-        DrawBorderSettings::WithoutBorder,
+        border_settings(),
         SecondaryWindowSettings::Default,
         MinimumUpdateIntervalSettings::Custom(Duration::from_millis(1000 / fps.max(1) as u64)),
         DirtyRegionSettings::Default,

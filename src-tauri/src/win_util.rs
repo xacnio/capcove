@@ -79,26 +79,64 @@ pub fn wait_or_kill_process(pid: u32, timeout_ms: u32) {
 #[cfg(not(windows))]
 pub fn wait_or_kill_process(_pid: u32, _timeout_ms: u32) {}
 
-/// One-time consent prompt so Windows stops drawing the capture border.
-/// MSIX-only (needs the `graphicsCaptureWithoutBorder` capability); answer
-/// is remembered permanently, so later calls just return the cached result.
+#[cfg(windows)]
+static BORDERLESS_GRANTED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+
+/// Whether the OS has granted borderless capture. Non-blocking: capture
+/// callers gate their `DrawBorderSettings` on this, so it must never block.
+/// Until [`request_borderless_capture_access`] has resolved it, unpackaged
+/// builds report `true` (they can always drop the border) and packaged builds
+/// report `false` (record bordered rather than risk a failed/hung start).
+#[cfg(windows)]
+pub fn borderless_capture_granted() -> bool {
+    match BORDERLESS_GRANTED.get() {
+        Some(v) => *v,
+        None => !is_packaged(),
+    }
+}
+
+#[cfg(not(windows))]
+pub fn borderless_capture_granted() -> bool {
+    true
+}
+
+/// Resolves borderless-capture access once and caches it. Blocks on a WinRT
+/// call, so it must run off the recording/UI hot path (startup, off-thread) —
+/// [`borderless_capture_granted`] stays non-blocking.
+///
+/// Runs the request on an MTA thread on purpose: a blocking `.get()` on an STA
+/// thread deadlocks, since the async completion needs the STA message pump this
+/// thread isn't pumping — which previously hung the whole capture on packaged
+/// builds.
 #[cfg(windows)]
 pub fn request_borderless_capture_access() {
-    if !is_packaged() {
+    if BORDERLESS_GRANTED.get().is_some() {
         return;
     }
-    use windows::Graphics::Capture::{GraphicsCaptureAccess, GraphicsCaptureAccessKind};
-    use windows::Security::Authorization::AppCapabilityAccess::AppCapabilityAccessStatus;
-    use windows::Win32::System::Com::{CoInitializeEx, COINIT_APARTMENTTHREADED};
+    let granted = if !is_packaged() {
+        true
+    } else {
+        use windows::Graphics::Capture::{GraphicsCaptureAccess, GraphicsCaptureAccessKind};
+        use windows::Security::Authorization::AppCapabilityAccess::AppCapabilityAccessStatus;
+        use windows::Win32::System::Com::{CoInitializeEx, COINIT_MULTITHREADED};
 
-    unsafe { let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED); }
-    let result = GraphicsCaptureAccess::RequestAccessAsync(GraphicsCaptureAccessKind::Borderless)
-        .and_then(|op| op.get());
-    match result {
-        Ok(AppCapabilityAccessStatus::Allowed) => log::info!("borderless screen capture: granted"),
-        Ok(status) => log::info!("borderless screen capture: not granted (status {})", status.0),
-        Err(e) => log::warn!("borderless screen capture request failed: {e}"),
-    }
+        unsafe { let _ = CoInitializeEx(None, COINIT_MULTITHREADED); }
+        match GraphicsCaptureAccess::RequestAccessAsync(GraphicsCaptureAccessKind::Borderless).and_then(|op| op.get()) {
+            Ok(AppCapabilityAccessStatus::Allowed) => {
+                log::info!("borderless screen capture: granted");
+                true
+            }
+            Ok(status) => {
+                log::info!("borderless screen capture: not granted (status {}) — recording with the OS capture border", status.0);
+                false
+            }
+            Err(e) => {
+                log::warn!("borderless screen capture request failed: {e} — recording with the OS capture border");
+                false
+            }
+        }
+    };
+    let _ = BORDERLESS_GRANTED.set(granted);
 }
 
 #[cfg(not(windows))]
@@ -252,6 +290,36 @@ pub fn is_packaged() -> bool {
 #[cfg(not(windows))]
 pub fn is_packaged() -> bool {
     false
+}
+
+/// Package family name (e.g. `Alperenetin.Capcove_w4kcn2812j35r`) when running
+/// from an MSIX/AppX package, else `None`. Used to locate the package's real
+/// writable folders, whose paths differ from the plain `%LOCALAPPDATA%` ones a
+/// packaged process's file writes get redirected into.
+#[cfg(windows)]
+pub fn package_family_name() -> Option<String> {
+    extern "system" {
+        fn GetCurrentPackageFamilyName(length: *mut u32, name: *mut u16) -> u32;
+    }
+    const ERROR_INSUFFICIENT_BUFFER: u32 = 122;
+
+    let mut length: u32 = 0;
+    // First call reports the required buffer length (including the null).
+    if unsafe { GetCurrentPackageFamilyName(&mut length, std::ptr::null_mut()) } != ERROR_INSUFFICIENT_BUFFER
+        || length == 0
+    {
+        return None; // not packaged, or no name
+    }
+    let mut buf = vec![0u16; length as usize];
+    if unsafe { GetCurrentPackageFamilyName(&mut length, buf.as_mut_ptr()) } != 0 {
+        return None;
+    }
+    Some(String::from_utf16_lossy(&buf[..(length as usize).saturating_sub(1)]))
+}
+
+#[cfg(not(windows))]
+pub fn package_family_name() -> Option<String> {
+    None
 }
 
 #[cfg(all(windows, not(debug_assertions)))]

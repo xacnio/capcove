@@ -431,6 +431,7 @@ pub(crate) fn start_configured_audio_sources(
     }
 
     for source in &sources {
+        log::info!("starting audio source: {source:?}");
         match start_audio_source(source, capture_paused.clone(), exclude_pid) {
             Ok((mut spec, handle)) => {
                 if !separate {
@@ -450,6 +451,7 @@ pub(crate) fn start_configured_audio_sources(
             Err(e) => log::warn!("failed to start audio source {source:?}: {e}"),
         }
     }
+    log::info!("audio setup complete: {} track(s)", audio_specs.len());
     (audio_specs, audio_handles)
 }
 
@@ -610,6 +612,11 @@ fn spawn_writer_thread(
         // forces one on the first eligible frame.
         let mut last_snapshot: Option<std::time::Instant> = None;
         const SNAPSHOT_INTERVAL: std::time::Duration = std::time::Duration::from_secs(3);
+        // Fail a start that never yields a frame (e.g. a capture the OS accepted
+        // but that produces nothing) instead of waiting forever in silence.
+        let started = std::time::Instant::now();
+        const FIRST_FRAME_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+        let mut aborted_no_frames = false;
         loop {
             // Apply pending on/off toggles before this tick's frame handling;
             // starting or stopping one job never touches the other or the capture.
@@ -633,6 +640,17 @@ fn spawn_writer_thread(
                         pending_live = None;
                     }
                 }
+            }
+            // No frame yet after the timeout, and the target isn't merely
+            // minimized (a legitimately blank source): the capture never
+            // delivered anything, so surface it instead of hanging.
+            if dims.is_none() && started.elapsed() > FIRST_FRAME_TIMEOUT
+                && placeholder::window_occlusion(window_hwnd, false) != placeholder::Occlusion::Minimized
+            {
+                log::error!("no capture frames within {}s of starting — aborting the recording", FIRST_FRAME_TIMEOUT.as_secs());
+                crate::notify_error(&app, "Recording failed to start — no frames were captured from the selected target");
+                aborted_no_frames = true;
+                break;
             }
             if let Some((w, h)) = dims {
                 if let Some(path) = pending_local.take() {
@@ -693,6 +711,7 @@ fn spawn_writer_thread(
                         // placeholder cards are cropped/rendered to match.
                         dims = Some(encoder::even_dims(msg.width, msg.height));
                         let (w, h) = dims.unwrap();
+                        log::info!("first capture frame {}x{} — starting encoder at {w}x{h}", msg.width, msg.height);
                         if let Some(path) = pending_local.take() {
                             match encoder::spawn_local(&app, w, h, fps, &encoder, bitrate_kbps, rate_control, quality, &audio_specs, &audio_codec, &resolution, &container, &path) {
                                 Ok((new_job, rx)) => {
@@ -806,6 +825,17 @@ fn spawn_writer_thread(
         }
         if let Some(t) = live_stop {
             let _ = t.join();
+        }
+        // Frameless abort: tear the (still "active") session down so the tray/
+        // HUD reset — off-thread, since stop_recording joins this very thread.
+        if aborted_no_frames {
+            let app2 = app.clone();
+            let sid = session_id.clone();
+            std::thread::spawn(move || {
+                if app2.state::<Arc<RecordingManager>>().current_session().map(|s| s.id) == Some(sid) {
+                    let _ = stop_recording(&app2);
+                }
+            });
         }
     })
 }
@@ -1156,6 +1186,13 @@ async fn prepare(app: &AppHandle, game_name: Option<&str>, game_pid: Option<u32>
     if manager.is_recording() {
         return Err("A recording is already in progress".into());
     }
+    // Fail fast if ffmpeg can't be run at all (e.g. a packaged build whose
+    // bundled ffmpeg is missing or failed its integrity check) — otherwise the
+    // capture starts but can never write a file, looking like a silent hang.
+    if let Err(e) = crate::integrity::ffmpeg_sidecar(app) {
+        log::error!("cannot start recording — ffmpeg unavailable: {e}");
+        return Err(format!("ffmpeg is unavailable — {e}"));
+    }
     // One-time (Windows remembers the answer) consent prompt so the OS can
     // stop drawing its capture border — see `win_util::request_borderless_capture_access`.
     static BORDERLESS_REQUESTED: std::sync::Once = std::sync::Once::new();
@@ -1417,6 +1454,7 @@ fn finish_starting(
     hud::show(app, &session);
     start_tray_status_loop(app, session.id.clone());
 
+    log::info!("recording started: id={} encoder={:?} fps={} -> {}", session.id, session.encoder, session.fps, session.output_path.display());
     let _ = app.emit("recording-started", &session);
     notify_recording_toast(app, "Recording started", &session.target);
     crate::sound::play(&app.state::<Arc<ConfigStore>>().get().sound_effects.recording_started);
@@ -1507,15 +1545,26 @@ pub async fn start_window_recording_live(
     let mailbox2 = mailbox.clone();
     let (fps, capture_cursor, exclude_overlay_windows, crop_titlebar) =
         (video.fps, video.capture_cursor, video.exclude_overlay_windows, video.crop_titlebar);
+    log::info!("starting window capture: hwnd={hwnd}");
     let video_task = tauri::async_runtime::spawn_blocking(move || {
         capture_session::start_window_capture(hwnd, fps, capture_cursor, exclude_overlay_windows, crop_titlebar, mailbox2)
     });
-    let (audio_result, video_result) = tokio::join!(audio_task, video_task);
+    let (audio_result, video_result) = match tokio::time::timeout(
+        std::time::Duration::from_secs(15),
+        async { tokio::join!(audio_task, video_task) },
+    ).await {
+        Ok(pair) => pair,
+        Err(_) => {
+            log::error!("recording start timed out — capture/audio didn't initialize within 15s");
+            cleanup_failed_start(app, Vec::new(), live);
+            return Err("Recording start timed out — the capture or audio device didn't respond".into());
+        }
+    };
     let (audio_specs, audio_handles) = audio_result.map_err(|e| e.to_string())?;
     let capture_handle = match video_result.map_err(|e| e.to_string()) {
         Ok(Ok(h)) => h,
-        Ok(Err(e)) => { cleanup_failed_start(app, audio_handles, live); return Err(e); }
-        Err(e) => { cleanup_failed_start(app, audio_handles, live); return Err(e); }
+        Ok(Err(e)) => { log::error!("capture failed to start: {e}"); cleanup_failed_start(app, audio_handles, live); return Err(e); }
+        Err(e) => { log::error!("capture start task failed: {e}"); cleanup_failed_start(app, audio_handles, live); return Err(e); }
     };
     Ok(finish_starting(
         app,
@@ -1549,12 +1598,22 @@ pub async fn start_monitor_recording_live(app: &AppHandle, live: Option<crate::d
     let video_task = tauri::async_runtime::spawn_blocking(move || {
         capture_session::start_monitor_capture(None, fps, capture_cursor, None, mailbox2)
     });
-    let (audio_result, video_result) = tokio::join!(audio_task, video_task);
+    let (audio_result, video_result) = match tokio::time::timeout(
+        std::time::Duration::from_secs(15),
+        async { tokio::join!(audio_task, video_task) },
+    ).await {
+        Ok(pair) => pair,
+        Err(_) => {
+            log::error!("recording start timed out — capture/audio didn't initialize within 15s");
+            cleanup_failed_start(app, Vec::new(), live);
+            return Err("Recording start timed out — the capture or audio device didn't respond".into());
+        }
+    };
     let (audio_specs, audio_handles) = audio_result.map_err(|e| e.to_string())?;
     let capture_handle = match video_result.map_err(|e| e.to_string()) {
         Ok(Ok(h)) => h,
-        Ok(Err(e)) => { cleanup_failed_start(app, audio_handles, live); return Err(e); }
-        Err(e) => { cleanup_failed_start(app, audio_handles, live); return Err(e); }
+        Ok(Err(e)) => { log::error!("capture failed to start: {e}"); cleanup_failed_start(app, audio_handles, live); return Err(e); }
+        Err(e) => { log::error!("capture start task failed: {e}"); cleanup_failed_start(app, audio_handles, live); return Err(e); }
     };
     Ok(finish_starting(
         app,
@@ -1590,12 +1649,22 @@ pub async fn start_area_recording_live(app: &AppHandle, x: i32, y: i32, w: u32, 
         let crop = Some(((x - mon_x).max(0) as u32, (y - mon_y).max(0) as u32, w, h));
         capture_session::start_monitor_capture(Some(mon_index), fps, capture_cursor, crop, mailbox2)
     });
-    let (audio_result, video_result) = tokio::join!(audio_task, video_task);
+    let (audio_result, video_result) = match tokio::time::timeout(
+        std::time::Duration::from_secs(15),
+        async { tokio::join!(audio_task, video_task) },
+    ).await {
+        Ok(pair) => pair,
+        Err(_) => {
+            log::error!("recording start timed out — capture/audio didn't initialize within 15s");
+            cleanup_failed_start(app, Vec::new(), live);
+            return Err("Recording start timed out — the capture or audio device didn't respond".into());
+        }
+    };
     let (audio_specs, audio_handles) = audio_result.map_err(|e| e.to_string())?;
     let capture_handle = match video_result.map_err(|e| e.to_string()) {
         Ok(Ok(h)) => h,
-        Ok(Err(e)) => { cleanup_failed_start(app, audio_handles, live); return Err(e); }
-        Err(e) => { cleanup_failed_start(app, audio_handles, live); return Err(e); }
+        Ok(Err(e)) => { log::error!("capture failed to start: {e}"); cleanup_failed_start(app, audio_handles, live); return Err(e); }
+        Err(e) => { log::error!("capture start task failed: {e}"); cleanup_failed_start(app, audio_handles, live); return Err(e); }
     };
     Ok(finish_starting(
         app,

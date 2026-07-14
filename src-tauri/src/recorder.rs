@@ -229,6 +229,26 @@ pub fn open(app: &AppHandle) {
                 if let Ok(raw) = win.hwnd() {
                     crate::win_util::set_capture_hidden(raw.0 as usize as u32, true);
                 }
+                let app_ev = app2.clone();
+                win.on_window_event(move |event| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        // Block closing the bar (and orphaning its region
+                        // frame) mid-recording — the user must stop first.
+                        if app_ev.state::<std::sync::Arc<crate::recording::RecordingManager>>().is_recording() {
+                            api.prevent_close();
+                            return;
+                        }
+                        // However the bar is closed (its button, Alt+F4, the
+                        // OS), take the region frame down with it so its border
+                        // lines don't linger on screen with no way to dismiss.
+                        FRAME_EPOCH.fetch_add(1, Ordering::SeqCst);
+                        if let Some(frame) = app_ev.get_webview_window(FRAME_LABEL) {
+                            let _ = frame.close();
+                        }
+                        *PICKED_WINDOW.lock().unwrap() = None;
+                        set_recorder_mode(&app_ev, None);
+                    }
+                });
             }
             Err(e) => log::warn!("recorder window could not be opened: {e}"),
         }
@@ -852,28 +872,36 @@ pub async fn recorder_start(app: AppHandle, mode: String, live: bool, window: Op
     #[cfg(windows)]
     {
         let broadcast = if live { crate::recording::try_start_live_broadcast(&app, None).await } else { None };
-        if mode == "area" {
-            let frame = app.get_webview_window(FRAME_LABEL).ok_or("Area frame is not open")?;
-            let scale = frame.scale_factor().map_err(|e| e.to_string())?;
-            let pos = frame.outer_position().map_err(|e| e.to_string())?;
-            let size = frame.outer_size().map_err(|e| e.to_string())?;
-            let border = (FRAME_BORDER_LOGICAL_PX * scale).round() as i32;
-            let px = pos.x + border;
-            let py = pos.y + border;
-            let pw = (size.width as i32 - border * 2).max(2) as u32;
-            let ph = (size.height as i32 - border * 2).max(2) as u32;
-            crate::recording::start_area_recording_live(&app, px, py, pw, ph, broadcast).await?;
-        } else if mode == "window" {
-            let target = window.ok_or("No window selected")?;
-            // force_own_audio=true: the user explicitly picked this window to
-            // record, so its own process audio should always get captured —
-            // independent of the "Game audio only"/separate-tracks settings
-            // that gate the equivalent auto-detected-game behavior elsewhere.
-            crate::recording::start_window_recording_live(&app, target.hwnd, target.title, target.app, broadcast, None, true, true).await?;
-        } else {
-            crate::recording::start_monitor_recording_live(&app, broadcast, None, true).await?;
+        let result: Result<(), String> = async {
+            if mode == "area" {
+                let frame = app.get_webview_window(FRAME_LABEL).ok_or("Area frame is not open")?;
+                let scale = frame.scale_factor().map_err(|e| e.to_string())?;
+                let pos = frame.outer_position().map_err(|e| e.to_string())?;
+                let size = frame.outer_size().map_err(|e| e.to_string())?;
+                let border = (FRAME_BORDER_LOGICAL_PX * scale).round() as i32;
+                let px = pos.x + border;
+                let py = pos.y + border;
+                let pw = (size.width as i32 - border * 2).max(2) as u32;
+                let ph = (size.height as i32 - border * 2).max(2) as u32;
+                crate::recording::start_area_recording_live(&app, px, py, pw, ph, broadcast).await?;
+            } else if mode == "window" {
+                let target = window.ok_or("No window selected")?;
+                // force_own_audio=true: the user explicitly picked this window to
+                // record, so its own process audio should always get captured —
+                // independent of the "Game audio only"/separate-tracks settings
+                // that gate the equivalent auto-detected-game behavior elsewhere.
+                crate::recording::start_window_recording_live(&app, target.hwnd, target.title, target.app, broadcast, None, true, true).await?;
+            } else {
+                crate::recording::start_monitor_recording_live(&app, broadcast, None, true).await?;
+            }
+            Ok(())
         }
-        Ok(())
+        .await;
+        if let Err(e) = &result {
+            log::error!("recorder_start failed (mode={mode}): {e}");
+            crate::notify_error(&app, &format!("Could not start recording: {e}"));
+        }
+        result
     }
     #[cfg(not(windows))]
     {
@@ -916,6 +944,11 @@ pub fn recorder_minimize(app: AppHandle) {
 /// callback — the same reentrancy hazard fixed above for the picker.
 #[tauri::command]
 pub async fn recorder_close(app: AppHandle) {
+    // Mirror the bar's CloseRequested guard: no tearing down mid-recording,
+    // or the frame closes while the bar's close is blocked (orphaned frame).
+    if app.state::<std::sync::Arc<crate::recording::RecordingManager>>().is_recording() {
+        return;
+    }
     FRAME_EPOCH.fetch_add(1, Ordering::SeqCst); // stop any running loop
     if let Some(frame) = app.get_webview_window(FRAME_LABEL) {
         let _ = frame.close();
