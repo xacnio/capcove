@@ -271,7 +271,10 @@ pub struct LiveStreamParams {
 }
 
 /// `Auto` resolution order: NVENC H.264 > AMF H.264 > software x264. Cached
-/// per app run — see `AutoEncoderCache`.
+/// per app run — see `AutoEncoderCache`. QSV is left out on purpose: it can
+/// probe fine yet stall or fail on real captures on some Intel systems, so
+/// Auto prefers the always-reliable software fallback. Users can still pick
+/// QSV explicitly.
 pub async fn resolve_auto(app: &AppHandle, ffmpeg_path: &Path) -> EncoderChoice {
     use tauri::Manager;
     if let Some(cache) = app.try_state::<AutoEncoderCache>() {
@@ -280,7 +283,7 @@ pub async fn resolve_auto(app: &AppHandle, ffmpeg_path: &Path) -> EncoderChoice 
         }
     }
     let mut resolved = EncoderChoice::X264Software;
-    for candidate in [EncoderChoice::NvencH264, EncoderChoice::AmfH264, EncoderChoice::QsvH264] {
+    for candidate in [EncoderChoice::NvencH264, EncoderChoice::AmfH264] {
         if probe_encoder(app, ffmpeg_path, &candidate).await {
             resolved = candidate;
             break;
