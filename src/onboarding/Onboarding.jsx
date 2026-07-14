@@ -67,6 +67,7 @@ function AudioQuickStep({ draft, apply, t }) {
 
   const DeviceRow = ({ kind, label, devs }) => {
     const source = sources.find((s) => s.kind === kind);
+    const defaultDev = devs.find((d) => d.is_default);
     const setDevice = (deviceId) => {
       const idx = sources.findIndex((s) => s.kind === kind);
       const entry = { ...(idx >= 0 ? sources[idx] : {}), kind, device_id: deviceId, label, enabled: true };
@@ -82,7 +83,7 @@ function AudioQuickStep({ draft, apply, t }) {
         <div className="flex items-center gap-2">
           {source && (
             <select className={`${inputCls} min-w-0 max-w-[190px] truncate`} value={source.device_id ?? ""} onChange={(e) => setDevice(e.target.value)}>
-              <option value="">{t("settings.audio.defaultDevice")}</option>
+              <option value="">{t("settings.audio.defaultDevice")}{defaultDev ? ` (${defaultDev.label})` : ""}</option>
               {devs.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
             </select>
           )}

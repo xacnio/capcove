@@ -19,6 +19,9 @@ use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, CLSCTX_ALL, 
 pub struct AudioDeviceInfo {
     pub id: String,
     pub label: String,
+    /// The current OS default endpoint for this flow — lets the UI show the
+    /// concrete device behind the "Default device" choice.
+    pub is_default: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -62,13 +65,19 @@ pub fn list_devices(flow: AudioFlow) -> Result<Vec<AudioDeviceInfo>, String> {
         let collection = enumerator
             .EnumAudioEndpoints(data_flow, DEVICE_STATE_ACTIVE)
             .map_err(|e| e.to_string())?;
+        let default_id = enumerator
+            .GetDefaultAudioEndpoint(data_flow, eConsole)
+            .ok()
+            .and_then(|d| d.GetId().ok())
+            .and_then(|s| s.to_string().ok());
         let count = collection.GetCount().map_err(|e| e.to_string())?;
         let mut out = Vec::with_capacity(count as usize);
         for i in 0..count {
             let device = collection.Item(i).map_err(|e| e.to_string())?;
             let id = device.GetId().map_err(|e| e.to_string())?.to_string().unwrap_or_default();
             let label = device_friendly_name(&device);
-            out.push(AudioDeviceInfo { id, label: if label.is_empty() { format!("Device {}", i + 1) } else { label } });
+            let is_default = default_id.as_deref() == Some(id.as_str());
+            out.push(AudioDeviceInfo { id, label: if label.is_empty() { format!("Device {}", i + 1) } else { label }, is_default });
         }
         Ok(out)
     }

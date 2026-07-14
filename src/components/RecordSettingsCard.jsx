@@ -1333,6 +1333,7 @@ function labelForDeviceSwitch(existingLabel, prevDeviceLabel, newDeviceLabel) {
 function PrimaryDeviceRow({ icon: Icn, label, kind, devices, sources, applyAudio, showMix, t }) {
   const source = sources.find((s) => s.kind === kind);
   const on = Boolean(source);
+  const defaultDev = devices.find((d) => d.is_default);
 
   const setDevice = (deviceId) => {
     const dev = devices.find((d) => d.id === deviceId);
@@ -1382,7 +1383,7 @@ function PrimaryDeviceRow({ icon: Icn, label, kind, devices, sources, applyAudio
           disabled={!on}
           className={`${inputCls} mt-1 w-full cursor-pointer truncate !py-1 !text-xs !text-stone-500 disabled:cursor-default disabled:opacity-40`}
         >
-          <option value="">{t("settings.audio.defaultDevice")}</option>
+          <option value="">{t("settings.audio.defaultDevice")}{defaultDev ? ` (${defaultDev.label})` : ""}</option>
           {devices.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
         </select>
       </div>
