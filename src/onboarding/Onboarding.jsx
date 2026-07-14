@@ -3,6 +3,7 @@ import { invoke } from "../lib/tauri.js";
 import { useT } from "../lib/i18n.js";
 import { Toggle, Row, Button, Card, inputCls } from "../components/settingsUI.jsx";
 import { RecordingModeCard, FPS_OPTIONS, RESOLUTION_OPTIONS, ENCODER_LABELS } from "../components/RecordSettingsCard.jsx";
+import { Flag } from "../components/Flag.jsx";
 import { ShortcutCard } from "../components/ShortcutEditor.jsx";
 import LegalDocModal from "../components/LegalDocModal.jsx";
 import { LEGAL_VERSION } from "../lib/legal.js";
@@ -238,7 +239,7 @@ export default function Onboarding({ onClose }) {
                     {LANGUAGES.map(({ code, label }) => (
                       <label key={code}
                         className="flex cursor-pointer items-center justify-between px-4 py-2.5 hover:bg-stone-800/50 rounded-lg transition-colors">
-                        <span className="text-sm text-stone-200">{label}</span>
+                        <span className="flex items-center gap-2 text-sm text-stone-200"><Flag code={code} /> {label}</span>
                         <input type="radio" name="ob_language" value={code}
                           checked={lang === code}
                           onChange={() => apply({ language: code })}

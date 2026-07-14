@@ -11,14 +11,15 @@ import { RecordSettingsCard, RecordingModeCard, YoutubeLiveSettingsCard, AudioSe
 import SizeCalculatorCard from "../components/SizeCalculatorCard.jsx";
 import QualityWizardModal from "../components/QualityWizardModal.jsx";
 import { StorageSettingsCard } from "../components/StorageSettingsCard.jsx";
+import { Flag } from "../components/Flag.jsx";
 import LegalDocModal from "../components/LegalDocModal.jsx";
 import WhatsNewModal from "../components/WhatsNewModal.jsx";
 import { compareVersions } from "../lib/version.js";
 import logo from "../assets/logo.png";
 
 const LANGUAGES = [
-  { code: "en", label: "English", flag: "🇬🇧" },
-  { code: "tr", label: "Türkçe", flag: "🇹🇷" },
+  { code: "en", label: "English" },
+  { code: "tr", label: "Türkçe" },
 ];
 
 // Content strings the sidebar search matches against, keyed by page id.
@@ -950,12 +951,12 @@ export default function SettingsView({ t, lang, dateLocale, onRerunWizard, reque
             <>
               <Card title={t("settings.language.title")}>
                 <div className="flex items-center gap-1.5 py-3">
-                  {LANGUAGES.map(({ code, label, flag }) => (
+                  {LANGUAGES.map(({ code, label }) => (
                     <button key={code} onClick={() => apply({ language: code })}
                       className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
                         (settings.language ?? "en") === code ? "bg-stone-800 text-stone-100" : "text-stone-500 hover:bg-stone-800/60"
                       }`}>
-                      <span>{flag}</span> {label}
+                      <Flag code={code} /> {label}
                     </button>
                   ))}
                 </div>
