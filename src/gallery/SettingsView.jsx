@@ -248,7 +248,7 @@ export default function SettingsView({ t, lang, dateLocale, onRerunWizard, reque
   const [driveFolders,       setDriveFolders]      = useState(null);
   const [loadingFolders,     setLoadingFolders]    = useState(false);
   const [ytChannel,          setYtChannel]         = useState(null);
-  const [page,               setPage]              = useState("shortcuts");
+  const [page,               setPage]              = useState("general");
   const [search,              setSearch]            = useState("");
   const [calculatorOpen,     setCalculatorOpen]    = useState(false);
   const [wizardOpen,         setWizardOpen]        = useState(false);
@@ -988,6 +988,13 @@ export default function SettingsView({ t, lang, dateLocale, onRerunWizard, reque
                 {isWindows && (settings.run_as_admin ?? false) && (settings.autostart ?? false) && isElevated && (
                   <div className="pb-3 text-xs text-accent-400/80">{t("settings.admin.autostartNote")}</div>
                 )}
+              </Card>
+              <Card title={t("settings.logs.title")}>
+                <Row label={t("settings.logs.hint")}>
+                  <Button onClick={() => invoke("open_logs")}>
+                    {t("settings.logs.open")}
+                  </Button>
+                </Row>
               </Card>
               <Card title={t("settings.rerunSetup")}>
                 <button onClick={onRerunWizard}
