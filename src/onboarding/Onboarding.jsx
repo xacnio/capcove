@@ -39,7 +39,7 @@ function VideoQuickStep({ draft, apply, t }) {
       </Row>
       <Row label={t("settings.video.encoder")}>
         <div className="flex items-center gap-2">
-          <select className={inputCls} value={video.encoder ?? "auto"} disabled={loadingEncoders} onChange={(e) => setV({ encoder: e.target.value })}>
+          <select className={`${inputCls} min-w-0 max-w-[190px] truncate`} value={video.encoder ?? "auto"} disabled={loadingEncoders} onChange={(e) => setV({ encoder: e.target.value })}>
             <option value="auto">{ENCODER_LABELS.auto ?? "Auto"}</option>
             {(encoders ?? []).filter((e) => e.available).map((e) => (
               <option key={e.kind} value={e.kind}>{ENCODER_LABELS[e.kind] ?? e.label ?? e.kind}</option>
@@ -81,7 +81,7 @@ function AudioQuickStep({ draft, apply, t }) {
       <Row label={label}>
         <div className="flex items-center gap-2">
           {source && (
-            <select className={inputCls} value={source.device_id ?? devs[0]?.id ?? ""} onChange={(e) => setDevice(e.target.value)}>
+            <select className={`${inputCls} min-w-0 max-w-[190px] truncate`} value={source.device_id ?? devs[0]?.id ?? ""} onChange={(e) => setDevice(e.target.value)}>
               {devs.length === 0 && <option value="">{t("settings.audio.noDevices")}</option>}
               {devs.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
             </select>
