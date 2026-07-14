@@ -673,6 +673,11 @@ export default {
     },
     language: { title: "Dil" },
     startup: { title: "Başlangıç" },
+    logs: {
+      title: "Loglar",
+      hint: "Kayıt sorunlarını teşhis etmek için log dosyasını aç.",
+      open: "Logları Aç",
+    },
     about: {
       title: "Hakkında",
       version: "Versiyon",

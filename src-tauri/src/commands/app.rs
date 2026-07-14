@@ -303,6 +303,15 @@ pub fn open_settings(app: AppHandle) {
     tray::show_settings(&app);
 }
 
+/// Opens the app log file — lets an installed (packaged) build's log be reached
+/// from Settings > General without hunting for its redirected package path.
+#[tauri::command]
+pub fn open_logs(app: AppHandle) {
+    let Some(path) = crate::logging::log_file_path() else { return };
+    use tauri_plugin_opener::OpenerExt;
+    let _ = app.opener().open_path(path.to_string_lossy().to_string(), None::<&str>);
+}
+
 #[tauri::command]
 pub async fn pick_folder(app: AppHandle) -> Result<Option<String>, String> {
     let picked = tauri::async_runtime::spawn_blocking(move || {

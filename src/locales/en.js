@@ -673,6 +673,11 @@ export default {
     },
     language: { title: "Language" },
     startup: { title: "Startup" },
+    logs: {
+      title: "Logs",
+      hint: "Open the app log file to diagnose recording issues.",
+      open: "Open Logs",
+    },
     about: {
       title: "About",
       version: "Version",

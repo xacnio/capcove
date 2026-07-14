@@ -11,6 +11,7 @@ mod icon_cache;
 mod hud_native;
 mod integrity;
 mod library;
+mod logging;
 mod meta;
 mod overlay;
 mod recorder;
@@ -104,10 +105,9 @@ pub fn run() {
     #[cfg(target_os = "linux")]
     std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
 
-    // Default to `info` so diagnostics (e.g. the recording teardown/ffmpeg-exit
-    // logging in recording/mod.rs) are visible in the `cargo tauri dev` terminal
-    // without needing RUST_LOG set — still overridable via RUST_LOG as usual.
-    let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).try_init();
+    // Logs to stderr (dev) and a file (readable in a packaged build) — see
+    // `logging::init`. Tray "Open logs" opens that file.
+    logging::init();
     win_util::set_app_user_model_id();
     if !win_util::acquire_single_instance() {
         return;
@@ -157,6 +157,7 @@ pub fn run() {
             commands::app::pick_exe_file,
             commands::app::get_app_icon,
             commands::app::open_settings,
+            commands::app::open_logs,
             commands::app::get_is_elevated,
             commands::app::is_packaged_install,
             commands::app::request_admin,
@@ -435,6 +436,12 @@ pub fn run() {
             #[cfg(windows)]
             if integrity::ffmpeg_sidecar(app.handle()).is_err() {
                 notify_error(app.handle(), "ffmpeg/ffprobe failed an integrity check — recording and export are disabled until you reinstall Capcove.");
+            }
+            // Resolve borderless-capture access up front so the first recording
+            // doesn't pay the consent round-trip — see `borderless_capture_granted`.
+            #[cfg(windows)]
+            {
+                tauri::async_runtime::spawn_blocking(win_util::request_borderless_capture_access);
             }
             #[cfg(windows)]
             {
