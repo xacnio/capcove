@@ -406,6 +406,7 @@ export default {
       systemOutputs: "Sistem sesi",
       microphones: "Mikrofonlar",
       noDevices: "Cihaz bulunamadı",
+      defaultDevice: "Varsayılan cihaz",
       noneSelectedHint: "Ses kaynağı seçilmedi — kayıtlar sessiz olacak",
       multiTrackMp4Hint: "Çoklu ses track'i MKV'de MP4'ten daha güvenilir çalışır — yukarıdaki konteyneri değiştirmeyi düşün",
     },

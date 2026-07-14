@@ -406,6 +406,7 @@ export default {
       systemOutputs: "System audio",
       microphones: "Microphones",
       noDevices: "No devices found",
+      defaultDevice: "Default device",
       noneSelectedHint: "No audio sources selected — recordings will be silent",
       multiTrackMp4Hint: "Multiple audio tracks work more reliably in MKV than MP4 — consider switching the container above",
     },

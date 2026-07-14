@@ -1353,7 +1353,7 @@ function PrimaryDeviceRow({ icon: Icn, label, kind, devices, sources, applyAudio
       const idx = sources.findIndex((s) => s.kind === kind);
       applyAudio(sources.filter((_, i) => i !== idx));
     } else {
-      setDevice(devices[0]?.id ?? "");
+      setDevice(""); // enable following the OS default device
     }
   };
 
@@ -1377,12 +1377,12 @@ function PrimaryDeviceRow({ icon: Icn, label, kind, devices, sources, applyAudio
           }`}
         />
         <select
-          value={source?.device_id ?? devices[0]?.id ?? ""}
+          value={source?.device_id ?? ""}
           onChange={(e) => setDevice(e.target.value)}
           disabled={!on}
           className={`${inputCls} mt-1 w-full cursor-pointer truncate !py-1 !text-xs !text-stone-500 disabled:cursor-default disabled:opacity-40`}
         >
-          {devices.length === 0 && <option value="">{t("settings.audio.noDevices")}</option>}
+          <option value="">{t("settings.audio.defaultDevice")}</option>
           {devices.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
         </select>
       </div>

@@ -75,14 +75,14 @@ function AudioQuickStep({ draft, apply, t }) {
     const toggle = () => {
       const idx = sources.findIndex((s) => s.kind === kind);
       if (idx >= 0) applyAudio(sources.filter((_, i) => i !== idx));
-      else setDevice(devs[0]?.id ?? "");
+      else setDevice(""); // enable following the OS default device
     };
     return (
       <Row label={label}>
         <div className="flex items-center gap-2">
           {source && (
-            <select className={`${inputCls} min-w-0 max-w-[190px] truncate`} value={source.device_id ?? devs[0]?.id ?? ""} onChange={(e) => setDevice(e.target.value)}>
-              {devs.length === 0 && <option value="">{t("settings.audio.noDevices")}</option>}
+            <select className={`${inputCls} min-w-0 max-w-[190px] truncate`} value={source.device_id ?? ""} onChange={(e) => setDevice(e.target.value)}>
+              <option value="">{t("settings.audio.defaultDevice")}</option>
               {devs.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
             </select>
           )}
