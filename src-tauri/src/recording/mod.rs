@@ -1193,11 +1193,13 @@ async fn prepare(app: &AppHandle, game_name: Option<&str>, game_pid: Option<u32>
         log::error!("cannot start recording — ffmpeg unavailable: {e}");
         return Err(format!("ffmpeg is unavailable — {e}"));
     }
-    // One-time (Windows remembers the answer) consent prompt so the OS can
-    // stop drawing its capture border — see `win_util::request_borderless_capture_access`.
+    // Safety net in case startup's status check (see `lib.rs`) hasn't resolved
+    // yet — just re-checks the cached OS decision, never prompts (a live OS
+    // consent dialog popping up mid-recording-start would be jarring; the
+    // explainer modal/titlebar warning icon own that flow instead).
     static BORDERLESS_REQUESTED: std::sync::Once = std::sync::Once::new();
     BORDERLESS_REQUESTED.call_once(|| {
-        let _ = tauri::async_runtime::spawn_blocking(crate::win_util::request_borderless_capture_access);
+        let _ = tauri::async_runtime::spawn_blocking(|| crate::win_util::capability_status(crate::win_util::CapabilityKind::BorderlessCapture));
     });
     // Atomically reserves the start slot — see `RecordingManager::starting`'s
     // doc comment for why the `is_recording()` check above isn't enough on

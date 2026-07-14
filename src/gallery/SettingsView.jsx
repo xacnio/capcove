@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke, listen, emit } from "../lib/tauri.js";
 import {
-  MdKeyboard, MdVideocam, MdVolumeUp, MdTune, MdInfo, MdSearch, MdSportsEsports, MdNotifications, MdFiberManualRecord, MdStorage, MdMusicNote, MdCalculate, MdAutoAwesome, MdHighQuality, MdReplay, MdLiveTv,
+  MdKeyboard, MdVideocam, MdVolumeUp, MdTune, MdInfo, MdSearch, MdSportsEsports, MdNotifications, MdFiberManualRecord, MdStorage, MdMusicNote, MdCalculate, MdAutoAwesome, MdHighQuality, MdReplay, MdLiveTv, MdShield,
 } from "react-icons/md";
 import { GamesCard } from "../components/GamesCard.jsx";
 import { SiGoogledrive, SiYoutube } from "react-icons/si";
 import { Toggle, Radio, Row, Card, Button, inputCls } from "../components/settingsUI.jsx";
+import PermissionRow from "../components/PermissionRow.jsx";
 import { ShortcutCard } from "../components/ShortcutEditor.jsx";
 import { RecordSettingsCard, RecordingModeCard, YoutubeLiveSettingsCard, AudioSettingsCard, ReplayBufferCard, NotificationSettingsCard, IndicatorSettingsCard, SoundEffectsCard } from "../components/RecordSettingsCard.jsx";
 import SizeCalculatorCard from "../components/SizeCalculatorCard.jsx";
@@ -168,6 +169,12 @@ const CONTENT_KEYS = {
     "settings.admin.restartHint", "settings.admin.restartAsAdmin", "settings.admin.autostartNote",
     "settings.rerunSetup", "settings.rerunSetupHint",
   ],
+  permissions: [
+    "permissions.title", "permissions.body", "permissions.granted", "permissions.denied",
+    "permissions.allow", "permissions.openSettings",
+    "permissions.borderless_capture.label", "permissions.borderless_capture.desc",
+    "permissions.microphone.label", "permissions.microphone.desc",
+  ],
   about: [
     "settings.about.version", "settings.about.description", "settings.about.updateManagedByStore",
     "settings.about.autoUpdate", "settings.about.autoUpdateHint", "settings.about.checkForUpdates",
@@ -198,14 +205,20 @@ function useSettingsContentIndex(t) {
 }
 
 // Grouped nav — only pages backed by real Capcove features. `desc` feeds the
-// centered hero header of the content pane.
-function useNavGroups(t) {
+// centered hero header of the content pane. `isPackagedInstall` hides
+// "Permissions" outside an MSIX/Store install — the OS consent concept it
+// documents (borderless capture, microphone) simply doesn't exist for a plain
+// .exe, which never asks for either.
+function useNavGroups(t, isPackagedInstall) {
   return [
     {
       label: t("settings.groups.app"),
       items: [
         { id: "general",   label: t("settings.nav.general.label"),   Icon: MdTune,     desc: t("settings.pageDesc.general") },
         { id: "shortcuts", label: t("settings.nav.shortcuts.label"), Icon: MdKeyboard, desc: t("settings.pageDesc.shortcuts") },
+        ...(isPackagedInstall
+          ? [{ id: "permissions", label: t("settings.nav.permissions.label"), Icon: MdShield, desc: t("settings.pageDesc.permissions") }]
+          : []),
         { id: "about",     label: t("settings.nav.about.label"),     Icon: MdInfo,     desc: t("settings.pageDesc.about") },
       ],
     },
@@ -261,6 +274,7 @@ export default function SettingsView({ t, lang, dateLocale, onRerunWizard, reque
   }, [requestedPage]);
   const [isElevated,         setIsElevated]        = useState(false);
   const [isPackagedInstall,  setIsPackagedInstall] = useState(false);
+  const [capabilities,       setCapabilities]      = useState([]); // [{kind, status, settings_uri}] — see win_util::CapabilityKind
   const isWindows = typeof navigator !== "undefined" && navigator.userAgent.includes("Windows");
   const [postConnectFolders, setPostConnectFolders] = useState(null);
   const [postConnectLoading, setPostConnectLoading] = useState(false);
@@ -280,6 +294,29 @@ export default function SettingsView({ t, lang, dateLocale, onRerunWizard, reque
   const refreshDriveStatus = useCallback(async () => {
     setDrive(await invoke("get_drive_status"));
   }, []);
+
+  // Which capability's row button is mid-action — the OS consent prompt
+  // itself can take a beat to appear, so the button shows a spinner instead
+  // of looking unresponsive.
+  const [pendingCapability, setPendingCapability] = useState(null);
+
+  // Same action a permission row takes in the first-run explainer modal:
+  // still askable → real OS prompt; already denied → that capability's
+  // Settings page, since Windows won't prompt again.
+  const actOnCapability = useCallback(async (kind, status) => {
+    if (status === "denied") {
+      const cap = capabilities.find((c) => c.kind === kind);
+      if (cap) invoke("open_url", { url: cap.settings_uri }).catch(() => {});
+      return;
+    }
+    setPendingCapability(kind);
+    try {
+      const result = await invoke("request_capability", { kind }).catch(() => "denied");
+      setCapabilities((prev) => prev.map((c) => (c.kind === kind ? { ...c, status: result } : c)));
+    } finally {
+      setPendingCapability(null);
+    }
+  }, [capabilities]);
 
   const saveNow = useCallback(async (next) => {
     clearTimeout(saveTimer.current);
@@ -317,6 +354,7 @@ export default function SettingsView({ t, lang, dateLocale, onRerunWizard, reque
       }).catch(() => { setCustomCreds(!!s.google_client_id); });
       invoke("get_is_elevated").then(setIsElevated).catch(() => {});
       invoke("is_packaged_install").then(setIsPackagedInstall).catch(() => {});
+      invoke("capability_statuses").then(setCapabilities).catch(() => {});
       refreshDriveStatus();
       invoke("get_transfers").then(setTransfers).catch(() => {});
       unlisten.push(await listen("sync-transfers-changed", (event) => setTransfers(event.payload)));
@@ -472,7 +510,7 @@ export default function SettingsView({ t, lang, dateLocale, onRerunWizard, reque
 
   const syncNow = async () => { await invoke("sync_now"); };
 
-  const groups = useNavGroups(t);
+  const groups = useNavGroups(t, isPackagedInstall);
   const contentIndex = useSettingsContentIndex(t);
   const needle = search.trim().toLowerCase();
   const contentMatches = (id, needleStr) =>
@@ -1007,6 +1045,15 @@ export default function SettingsView({ t, lang, dateLocale, onRerunWizard, reque
                 </button>
               </Card>
             </>
+          )}
+
+          {page === "permissions" && isPackagedInstall && (
+            <Card title={t("permissions.title")}>
+              <p className="pt-3 text-xs text-stone-500">{t("permissions.body")}</p>
+              {capabilities.map((c) => (
+                <PermissionRow key={c.kind} t={t} capability={c} pending={pendingCapability === c.kind} onAct={actOnCapability} />
+              ))}
+            </Card>
           )}
 
           {page === "about" && (

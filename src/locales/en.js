@@ -74,6 +74,7 @@ export default {
       general: "Language, startup behavior and admin mode.",
       about: "Version, updates and licenses.",
       storage: "Choose where Capcove stores the gameplay it captures and how Capcove should use space on your PC.",
+      permissions: "Windows permissions Capcove has asked for, and their current status.",
     },
     nav: {
       shortcuts: { label: "Shortcuts",    desc: "Screenshot shortcuts" },
@@ -88,6 +89,7 @@ export default {
       advanced:  { label: "Advanced",      desc: "Google OAuth credentials" },
       about:     { label: "About",         desc: "Capcove" },
       storage:   { label: "Storage",       desc: "PC Storage" },
+      permissions: { label: "Permissions", desc: "Windows access" },
     },
     storage: {
       settingsTitle: "Local Storage",
@@ -1411,6 +1413,24 @@ export default {
   updateModal: {
     title: "Update available",
     later: "Later",
+  },
+  permissions: {
+    title: "Requested permissions",
+    body: "Capcove asks Windows for a couple of permissions so recordings look and sound the way they should.",
+    close: "Close",
+    granted: "Granted",
+    denied: "Denied — enable it manually in Windows Settings",
+    allow: "Allow",
+    openSettings: "Open Settings",
+    warningTooltip: "A permission needs attention — click to review",
+    borderless_capture: {
+      label: "Borderless capture",
+      desc: "Removes the yellow capture border from recordings and screenshots.",
+    },
+    microphone: {
+      label: "Microphone",
+      desc: "Lets Capcove record your microphone as an audio track.",
+    },
   },
   overlay: {
     areaHint:       "Select an area · Press Esc or right-click to cancel",

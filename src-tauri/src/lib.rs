@@ -161,6 +161,8 @@ pub fn run() {
             commands::app::get_is_elevated,
             commands::app::is_packaged_install,
             commands::app::request_admin,
+            commands::app::capability_statuses,
+            commands::app::request_capability,
             commands::overlay_cmd::get_overlay_image,
             commands::overlay_cmd::get_overlay_setup,
             commands::overlay_cmd::area_selected,
@@ -442,9 +444,12 @@ pub fn run() {
             }
             // Resolve borderless-capture access up front so the first recording
             // doesn't pay the consent round-trip — see `borderless_capture_granted`.
+            // Only checks the cached OS decision (never prompts): the actual
+            // consent prompt is only ever shown from the frontend's explainer
+            // modal or its titlebar warning icon, not silently at startup.
             #[cfg(windows)]
             {
-                tauri::async_runtime::spawn_blocking(win_util::request_borderless_capture_access);
+                tauri::async_runtime::spawn_blocking(|| win_util::capability_status(win_util::CapabilityKind::BorderlessCapture));
             }
             // Probe available encoders up front (each is a real ffmpeg dry-run)
             // so the settings/onboarding UIs read them from cache instantly

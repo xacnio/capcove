@@ -74,6 +74,7 @@ export default {
       general: "Dil, başlangıç davranışı ve yönetici modu.",
       about: "Sürüm, güncellemeler ve lisanslar.",
       storage: "Capcove'un kayıtlarını nerede sakladığını ve bilgisayarındaki alanı nasıl kullanacağını seç.",
+      permissions: "Capcove'un Windows'tan istediği izinler ve şu anki durumları.",
     },
     nav: {
       shortcuts: { label: "Kısayollar",  desc: "Ekran görüntüsü kısayolları" },
@@ -88,6 +89,7 @@ export default {
       advanced:  { label: "Gelişmiş",     desc: "Google OAuth kimlik bilgileri" },
       about:     { label: "Hakkında",     desc: "Capcove" },
       storage:   { label: "Depolama",     desc: "Bilgisayar Depolaması" },
+      permissions: { label: "İzinler", desc: "Windows erişimi" },
     },
     storage: {
       settingsTitle: "Yerel Depolama",
@@ -1411,6 +1413,24 @@ export default {
   updateModal: {
     title: "Güncelleme mevcut",
     later: "Daha sonra",
+  },
+  permissions: {
+    title: "İstenen izinler",
+    body: "Capcove, kayıtların doğru görünüp doğru çalışması için Windows'tan birkaç izin istiyor.",
+    close: "Kapat",
+    granted: "İzin verildi",
+    denied: "Reddedildi — Windows Ayarları'ndan elle açman gerekiyor",
+    allow: "İzin ver",
+    openSettings: "Ayarları Aç",
+    warningTooltip: "Bir izin dikkat gerektiriyor — incelemek için tıklayın",
+    borderless_capture: {
+      label: "Kenarlıksız kayıt",
+      desc: "Sarı kayıt kenarlığını kayıtlardan ve ekran görüntülerinden kaldırır.",
+    },
+    microphone: {
+      label: "Mikrofon",
+      desc: "Capcove'un mikrofonunu ses kanalı olarak kaydetmesini sağlar.",
+    },
   },
   overlay: {
     areaHint:       "Bir alan seçin · İptal için Esc / sağ tık",

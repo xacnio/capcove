@@ -384,6 +384,44 @@ pub fn request_admin() {
 }
 
 #[derive(Serialize)]
+pub struct CapabilityInfo {
+    pub kind: crate::win_util::CapabilityKind,
+    pub status: crate::win_util::CapabilityStatus,
+    pub settings_uri: &'static str,
+}
+
+/// Current OS consent status for every capability Capcove tracks (borderless
+/// capture, microphone, …), without showing any prompt. Drives the unified
+/// "requested permissions" modal and the titlebar warning icon (see
+/// `Settings::permissions_prompt_seen`).
+#[tauri::command]
+pub async fn capability_statuses() -> Vec<CapabilityInfo> {
+    tauri::async_runtime::spawn_blocking(|| {
+        crate::win_util::CapabilityKind::ALL
+            .into_iter()
+            .map(|kind| CapabilityInfo {
+                kind,
+                status: crate::win_util::capability_status(kind),
+                settings_uri: kind.settings_uri(),
+            })
+            .collect()
+    })
+    .await
+    .unwrap_or_default()
+}
+
+/// Shows the actual OS consent prompt for one capability (only pops UI if
+/// Windows hasn't recorded a decision yet; otherwise just returns the cached
+/// status) — called from the permissions modal's "Allow" button and from the
+/// titlebar warning icon when a prompt is still possible.
+#[tauri::command]
+pub async fn request_capability(kind: crate::win_util::CapabilityKind) -> crate::win_util::CapabilityStatus {
+    tauri::async_runtime::spawn_blocking(move || crate::win_util::request_capability(kind))
+        .await
+        .unwrap_or(crate::win_util::CapabilityStatus::Denied)
+}
+
+#[derive(Serialize)]
 pub struct PlatformCapabilities {
     pub os: &'static str,
     /// Whether the window picker (select-a-window capture) is expected to work.

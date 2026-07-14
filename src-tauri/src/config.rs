@@ -953,6 +953,11 @@ pub struct Settings {
     pub deletion_summary_acked_at: i64,
     #[serde(default)]
     pub sound_effects: SoundEffectsSettings,
+    /// Whether the unified "requested permissions" explainer modal has
+    /// already been shown/actioned once (Allow or Not now), so it never
+    /// reappears on a later launch — see `win_util::capability_status`.
+    #[serde(default)]
+    pub permissions_prompt_seen: bool,
 }
 
 impl Default for Settings {
@@ -986,6 +991,7 @@ impl Default for Settings {
             recording_folders: Vec::new(),
             deletion_summary_acked_at: 0,
             sound_effects: SoundEffectsSettings::default(),
+            permissions_prompt_seen: false,
         }
     }
 }

@@ -79,19 +79,26 @@ pub fn wait_or_kill_process(pid: u32, timeout_ms: u32) {
 #[cfg(not(windows))]
 pub fn wait_or_kill_process(_pid: u32, _timeout_ms: u32) {}
 
+// 2 = unresolved (default until a check/request completes at least once).
 #[cfg(windows)]
-static BORDERLESS_GRANTED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+static BORDERLESS_GRANTED: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(2);
+
+#[cfg(windows)]
+fn set_borderless_granted(granted: bool) {
+    BORDERLESS_GRANTED.store(granted as u8, std::sync::atomic::Ordering::Relaxed);
+}
 
 /// Whether the OS has granted borderless capture. Non-blocking: capture
 /// callers gate their `DrawBorderSettings` on this, so it must never block.
-/// Until [`request_borderless_capture_access`] has resolved it, unpackaged
-/// builds report `true` (they can always drop the border) and packaged builds
+/// Until a status check has resolved it at least once, unpackaged builds
+/// report `true` (they can always drop the border) and packaged builds
 /// report `false` (record bordered rather than risk a failed/hung start).
 #[cfg(windows)]
 pub fn borderless_capture_granted() -> bool {
-    match BORDERLESS_GRANTED.get() {
-        Some(v) => *v,
-        None => !is_packaged(),
+    match BORDERLESS_GRANTED.load(std::sync::atomic::Ordering::Relaxed) {
+        0 => false,
+        1 => true,
+        _ => !is_packaged(),
     }
 }
 
@@ -100,47 +107,153 @@ pub fn borderless_capture_granted() -> bool {
     true
 }
 
-/// Resolves borderless-capture access once and caches it. Blocks on a WinRT
-/// call, so it must run off the recording/UI hot path (startup, off-thread) —
-/// [`borderless_capture_granted`] stays non-blocking.
+/// Current state of an OS consent capability, for the settings-icon warning
+/// and its explainer modal in the frontend.
+#[derive(serde::Serialize, Clone, Copy, PartialEq, Eq, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum CapabilityStatus {
+    /// Unpackaged build — the capability doesn't apply.
+    NotApplicable,
+    /// Packaged, never decided yet — requesting access will show the OS prompt.
+    NeedsPrompt,
+    Granted,
+    /// Packaged and previously denied (by the user or by policy) — Windows
+    /// won't show the prompt again; only Settings can change this now.
+    Denied,
+}
+
+/// The consent-gated capabilities Capcove tracks, unified under one
+/// "requested permissions" UI in the frontend instead of separate one-off
+/// modals per capability.
+#[derive(serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum CapabilityKind {
+    /// `graphicsCaptureWithoutBorder` — suppresses the OS's yellow capture
+    /// border from ending up in recordings/screenshots.
+    BorderlessCapture,
+    /// `microphone` — capturing the mic as an audio track.
+    Microphone,
+}
+
+impl CapabilityKind {
+    pub const ALL: [CapabilityKind; 2] = [CapabilityKind::BorderlessCapture, CapabilityKind::Microphone];
+
+    /// The name Windows tracks this capability's consent under — matches the
+    /// manifest's `<rescap:Capability>`/`<DeviceCapability>` `Name` attribute.
+    fn capability_name(self) -> &'static str {
+        match self {
+            Self::BorderlessCapture => "graphicsCaptureWithoutBorder",
+            Self::Microphone => "microphone",
+        }
+    }
+
+    /// Deep link to this capability's page in Windows Settings, for when
+    /// Windows won't show the consent prompt again after a denial.
+    pub fn settings_uri(self) -> &'static str {
+        match self {
+            Self::BorderlessCapture => "ms-settings:privacy-graphicscapturewithoutborder",
+            Self::Microphone => "ms-settings:privacy-microphone",
+        }
+    }
+}
+
+/// Checks the current OS consent status for `kind` without showing any
+/// prompt. Blocks on a WinRT call, so it must run off the UI thread.
+#[cfg(windows)]
+pub fn capability_status(kind: CapabilityKind) -> CapabilityStatus {
+    if !is_packaged() {
+        return CapabilityStatus::NotApplicable;
+    }
+    use windows::Security::Authorization::AppCapabilityAccess::{AppCapability, AppCapabilityAccessStatus};
+    use windows::Win32::System::Com::{CoInitializeEx, COINIT_MULTITHREADED};
+    use windows_core::HSTRING;
+
+    unsafe { let _ = CoInitializeEx(None, COINIT_MULTITHREADED); }
+    match AppCapability::Create(&HSTRING::from(kind.capability_name())).and_then(|cap| cap.CheckAccess()) {
+        Ok(AppCapabilityAccessStatus::Allowed) => {
+            if kind == CapabilityKind::BorderlessCapture { set_borderless_granted(true); }
+            CapabilityStatus::Granted
+        }
+        Ok(AppCapabilityAccessStatus::UserPromptRequired) => CapabilityStatus::NeedsPrompt,
+        Ok(status) => {
+            log::info!("{kind:?}: denied (status {})", status.0);
+            if kind == CapabilityKind::BorderlessCapture { set_borderless_granted(false); }
+            CapabilityStatus::Denied
+        }
+        Err(e) => {
+            log::warn!("{kind:?} status check failed: {e}");
+            CapabilityStatus::NeedsPrompt
+        }
+    }
+}
+
+#[cfg(not(windows))]
+pub fn capability_status(_kind: CapabilityKind) -> CapabilityStatus {
+    CapabilityStatus::NotApplicable
+}
+
+/// Actually shows the OS consent prompt for `kind` (only does so if Windows
+/// hasn't recorded a decision yet — otherwise it just returns the cached
+/// status, or in microphone's case briefly opens the device for nothing).
+/// Blocks on a WinRT/WASAPI call, so it must run off the UI thread.
 ///
+/// Borderless capture and microphone need genuinely different APIs to
+/// trigger their prompt: `GraphicsCaptureAccess.RequestAccessAsync` works
+/// directly. Microphone consent isn't tied to a request API at all — Windows
+/// shows it the first time an app actually starts a capture stream, so
+/// `audio_capture::request_microphone_consent` just does exactly that,
+/// briefly, and tears it back down.
+#[cfg(windows)]
+pub fn request_capability(kind: CapabilityKind) -> CapabilityStatus {
+    if !is_packaged() {
+        return CapabilityStatus::NotApplicable;
+    }
+    match kind {
+        CapabilityKind::BorderlessCapture => request_borderless_capture_access(),
+        CapabilityKind::Microphone => match crate::recording::audio_capture::request_microphone_consent() {
+            Ok(()) => CapabilityStatus::Granted,
+            Err(e) => {
+                log::warn!("microphone consent request failed: {e}");
+                CapabilityStatus::Denied
+            }
+        },
+    }
+}
+
+#[cfg(not(windows))]
+pub fn request_capability(_kind: CapabilityKind) -> CapabilityStatus {
+    CapabilityStatus::NotApplicable
+}
+
 /// Runs the request on an MTA thread on purpose: a blocking `.get()` on an STA
 /// thread deadlocks, since the async completion needs the STA message pump this
 /// thread isn't pumping — which previously hung the whole capture on packaged
 /// builds.
 #[cfg(windows)]
-pub fn request_borderless_capture_access() {
-    if BORDERLESS_GRANTED.get().is_some() {
-        return;
-    }
-    let granted = if !is_packaged() {
-        true
-    } else {
-        use windows::Graphics::Capture::{GraphicsCaptureAccess, GraphicsCaptureAccessKind};
-        use windows::Security::Authorization::AppCapabilityAccess::AppCapabilityAccessStatus;
-        use windows::Win32::System::Com::{CoInitializeEx, COINIT_MULTITHREADED};
+fn request_borderless_capture_access() -> CapabilityStatus {
+    use windows::Graphics::Capture::{GraphicsCaptureAccess, GraphicsCaptureAccessKind};
+    use windows::Security::Authorization::AppCapabilityAccess::AppCapabilityAccessStatus;
+    use windows::Win32::System::Com::{CoInitializeEx, COINIT_MULTITHREADED};
 
-        unsafe { let _ = CoInitializeEx(None, COINIT_MULTITHREADED); }
-        match GraphicsCaptureAccess::RequestAccessAsync(GraphicsCaptureAccessKind::Borderless).and_then(|op| op.get()) {
-            Ok(AppCapabilityAccessStatus::Allowed) => {
-                log::info!("borderless screen capture: granted");
-                true
-            }
-            Ok(status) => {
-                log::info!("borderless screen capture: not granted (status {}) — recording with the OS capture border", status.0);
-                false
-            }
-            Err(e) => {
-                log::warn!("borderless screen capture request failed: {e} — recording with the OS capture border");
-                false
-            }
+    unsafe { let _ = CoInitializeEx(None, COINIT_MULTITHREADED); }
+    match GraphicsCaptureAccess::RequestAccessAsync(GraphicsCaptureAccessKind::Borderless).and_then(|op| op.get()) {
+        Ok(AppCapabilityAccessStatus::Allowed) => {
+            log::info!("borderless screen capture: granted");
+            set_borderless_granted(true);
+            CapabilityStatus::Granted
         }
-    };
-    let _ = BORDERLESS_GRANTED.set(granted);
+        Ok(status) => {
+            log::info!("borderless screen capture: not granted (status {}) — recording with the OS capture border", status.0);
+            set_borderless_granted(false);
+            CapabilityStatus::Denied
+        }
+        Err(e) => {
+            log::warn!("borderless screen capture request failed: {e} — recording with the OS capture border");
+            set_borderless_granted(false);
+            CapabilityStatus::Denied
+        }
+    }
 }
-
-#[cfg(not(windows))]
-pub fn request_borderless_capture_access() {}
 
 /// Sets whole-window opacity (0-255) via a layered-window attribute. Needs
 /// `WS_EX_LAYERED` set once before `SetLayeredWindowAttributes` takes effect.

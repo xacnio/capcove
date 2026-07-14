@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { SiYoutube } from "react-icons/si";
-import { MdAdd, MdCropFree, MdWindow, MdFullscreen, MdDonutLarge } from "react-icons/md";
+import { MdAdd, MdCropFree, MdWindow, MdFullscreen, MdDonutLarge, MdWarningAmber } from "react-icons/md";
 import { invoke, listen, emit } from "../lib/tauri.js";
 import { useT } from "../lib/i18n.js";
 import { useClockSeconds } from "../lib/useClockSeconds.js";
@@ -11,6 +11,7 @@ import Onboarding from "../onboarding/Onboarding.jsx";
 import LegalUpdateModal from "../onboarding/LegalUpdateModal.jsx";
 import WhatsNewModal from "../components/WhatsNewModal.jsx";
 import UpdateAvailableModal from "../components/UpdateAvailableModal.jsx";
+import PermissionsModal from "../components/PermissionsModal.jsx";
 import { LEGAL_VERSION } from "../lib/legal.js";
 import { compareVersions } from "../lib/version.js";
 import VideoGrid from "./VideoGrid.jsx";
@@ -50,6 +51,11 @@ export default function App() {
   const [pendingClip, setPendingClip] = useState(null); // {game} | null — see `replay_buffer::stop_replay_buffer_for_pending_save`
   const [storageSummary, setStorageSummary] = useState(null); // {new_deletions, over_limit, use_recycle_bin} | null — see `video_thumb::check_storage_startup_summary`
   const [driveFull, setDriveFull] = useState(null); // { pct } | null — Drive ≥90% full, uploads auto-paused
+  // [{ kind, status, settings_uri }] — see `win_util::CapabilityKind`/`CapabilityStatus`.
+  // Feeds both the titlebar warning icon and whether the first-run
+  // "requested permissions" modal below should appear.
+  const [capabilities, setCapabilities] = useState([]);
+  const [showPermissionsModal, setShowPermissionsModal] = useState(false);
   // Recordings root, formatted for the folder-explorer breadcrumb (e.g.
   // "~/Videos/Capcove/") — see `recordings_root_display`.
   const [recordingsRootDisplay, setRecordingsRootDisplay] = useState("");
@@ -348,6 +354,72 @@ export default function App() {
     const info = await invoke("get_pending_update").catch(() => null);
     if (info && info.version !== s.last_notified_update_version) {
       setPendingUpdate(info);
+      return true;
+    }
+    return false;
+  }, []);
+
+  // Marks the explainer as seen so it never reappears, regardless of the
+  // choice made — "Close" just skips the OS prompt(s) for this session.
+  const dismissPermissionsPrompt = useCallback(async () => {
+    const s = await invoke("get_settings");
+    invoke("save_settings", { settings: { ...s, permissions_prompt_seen: true } });
+  }, []);
+
+  // Which capability's row button is mid-action — the OS consent prompt
+  // itself can take a beat to appear, so the button shows a spinner instead
+  // of looking unresponsive.
+  const [pendingCapability, setPendingCapability] = useState(null);
+
+  // One row's action button: while still askable this triggers the real OS
+  // prompt for that capability; once Windows has already recorded a denial
+  // (and won't prompt again) it opens that capability's Settings page
+  // instead, since that's the only way left to flip it.
+  const actOnCapability = useCallback(async (kind, status) => {
+    if (status === "denied") {
+      const cap = capabilities.find((c) => c.kind === kind);
+      if (cap) invoke("open_url", { url: cap.settings_uri }).catch(() => {});
+      return;
+    }
+    setPendingCapability(kind);
+    try {
+      const result = await invoke("request_capability", { kind }).catch(() => "denied");
+      setCapabilities((prev) => prev.map((c) => (c.kind === kind ? { ...c, status: result } : c)));
+    } finally {
+      setPendingCapability(null);
+    }
+  }, [capabilities]);
+
+  const closePermissionsModal = useCallback(() => {
+    setShowPermissionsModal(false);
+    dismissPermissionsPrompt();
+  }, [dismissPermissionsPrompt]);
+
+  // True once at least one tracked capability isn't granted (or n/a) — drives
+  // the titlebar warning icon.
+  const permissionsNeedAttention = capabilities.some((c) => c.status !== "granted" && c.status !== "not_applicable");
+
+  // Titlebar warning icon: re-checks every capability's OS status first (the
+  // user may have just come back from Windows Settings) and re-opens the
+  // explainer modal rather than acting immediately — same modal as the
+  // first-run prompt, just re-invoked on demand.
+  const clickPermissionsWarning = useCallback(async () => {
+    const list = await invoke("capability_statuses").catch(() => capabilities);
+    setCapabilities(list);
+    if (list.some((c) => c.status !== "granted" && c.status !== "not_applicable")) {
+      setShowPermissionsModal(true);
+    }
+  }, [capabilities]);
+
+  // Only ever called once onboarding/legal-update are out of the way (see the
+  // intro chain below) — otherwise this modal stacks right on top of those,
+  // both being centered `inset-0` overlays.
+  const checkPermissions = useCallback(async (s) => {
+    const list = await invoke("capability_statuses").catch(() => null);
+    if (list == null) return;
+    setCapabilities(list);
+    if (!s.permissions_prompt_seen && list.some((c) => c.status === "needs_prompt")) {
+      setShowPermissionsModal(true);
     }
   }, []);
 
@@ -392,7 +464,10 @@ export default function App() {
         if (autoMode) { /* no-op */ }
         else if (!s.onboarded) setShowOnboarding(true);
         else if (s.accepted_legal_version !== LEGAL_VERSION) setShowLegalUpdate(true);
-        else checkWhatsNew(s).then((shown) => { if (!shown) checkPendingUpdate(s); });
+        else checkWhatsNew(s).then((shown) => {
+          if (shown) return; // WhatsNewModal's onClose chains the rest once it's dismissed
+          checkPendingUpdate(s).then((shownUpdate) => { if (!shownUpdate) checkPermissions(s); });
+        });
       }
 
       invoke("recorder_current_mode").then(setRecorderMode).catch(() => {});
@@ -454,7 +529,7 @@ export default function App() {
       }
     })();
     return () => unlisten.forEach((u) => u());
-  }, [refreshDriveStatus, checkWhatsNew, checkPendingUpdate]);
+  }, [refreshDriveStatus, checkWhatsNew, checkPendingUpdate, checkPermissions]);
 
   const rerunWizard = () => {
     setView("folders");
@@ -467,6 +542,15 @@ export default function App() {
         lang={lang}
         right={
           <>
+            {permissionsNeedAttention && (
+              <button
+                onClick={clickPermissionsWarning}
+                title={t("permissions.warningTooltip")}
+                className="flex h-9 w-9 items-center justify-center rounded-full text-amber-400 transition hover:bg-stone-800 hover:text-amber-300"
+              >
+                <MdWarningAmber size={18} />
+              </button>
+            )}
             <button
               onClick={() => invoke("open_wheel").catch(() => {})}
               title={t("settings.shortcuts.captureOpenWheel")}
@@ -830,7 +914,10 @@ export default function App() {
         )}
 
         {showOnboarding && (
-          <Onboarding onClose={() => setShowOnboarding(false)} />
+          <Onboarding onClose={async () => {
+            setShowOnboarding(false);
+            checkPermissions(await invoke("get_settings"));
+          }} />
         )}
 
         {/* Terms/Privacy re-acceptance after either doc changes */}
@@ -839,7 +926,9 @@ export default function App() {
             setShowLegalUpdate(false);
             const s = await invoke("get_settings");
             const shown = await checkWhatsNew(s);
-            if (!shown) checkPendingUpdate(s);
+            if (shown) return; // WhatsNewModal's onClose chains the rest once it's dismissed
+            const shownUpdate = await checkPendingUpdate(s);
+            if (!shownUpdate) checkPermissions(s);
           }} />
         )}
 
@@ -850,7 +939,8 @@ export default function App() {
             const current = await invoke("get_app_version").catch(() => null);
             if (current) invoke("save_settings", { settings: { ...s, last_seen_version: current } });
             setWhatsNewReleases(null);
-            checkPendingUpdate(s);
+            const shownUpdate = await checkPendingUpdate(s);
+            if (!shownUpdate) checkPermissions(s);
           }} />
         )}
 
@@ -860,7 +950,13 @@ export default function App() {
             const s = await invoke("get_settings");
             invoke("save_settings", { settings: { ...s, last_notified_update_version: pendingUpdate.version } });
             setPendingUpdate(null);
+            checkPermissions(s);
           }} />
+        )}
+
+        {/* First-run explainer for the OS permissions Capcove asks for */}
+        {showPermissionsModal && (
+          <PermissionsModal t={t} capabilities={capabilities} pendingCapability={pendingCapability} onAct={actOnCapability} onClose={closePermissionsModal} />
         )}
 
         {/* Capcove closed unexpectedly during a recording last time.

@@ -315,6 +315,31 @@ pub fn default_render_device_id() -> Option<String> {
     }
 }
 
+/// Triggers the OS microphone-consent prompt by briefly starting a real
+/// capture stream on the default device — the exact same `Activate` →
+/// `Initialize` → `Start` sequence `start_capture` uses for a real recording,
+/// immediately torn back down. `ActivateAudioInterfaceAsync` (the API
+/// generally recommended for triggering this consent flow, e.g. via the
+/// `Windows.Media.Capture.MediaCapture` UWP surface) did not reliably surface
+/// the prompt for a plain WASAPI activation in testing — actually starting
+/// the stream does, matching what real recordings already observably do.
+pub fn request_microphone_consent() -> Result<(), String> {
+    unsafe {
+        let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+        let enumerator: IMMDeviceEnumerator =
+            CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL).map_err(|e| e.to_string())?;
+        let device = enumerator.GetDefaultAudioEndpoint(eCapture, eConsole).map_err(|e| e.to_string())?;
+        let client: IAudioClient = device.Activate(CLSCTX_ALL, None).map_err(|e| e.to_string())?;
+        let mix_format = client.GetMixFormat().map_err(|e| e.to_string())?;
+        let init_result = client.Initialize(AUDCLNT_SHAREMODE_SHARED, 0, 200_0000, 0, mix_format, None);
+        windows::Win32::System::Com::CoTaskMemFree(Some(mix_format as *mut core::ffi::c_void));
+        init_result.map_err(|e| e.to_string())?;
+        client.Start().map_err(|e| e.to_string())?;
+        let _ = client.Stop();
+        Ok(())
+    }
+}
+
 fn start_process_capture_mode(
     pid: u32,
     exclude: bool,
