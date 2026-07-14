@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { SiYoutube } from "react-icons/si";
-import { MdAdd, MdCropFree, MdWindow, MdFullscreen } from "react-icons/md";
+import { MdAdd, MdCropFree, MdWindow, MdFullscreen, MdDonutLarge } from "react-icons/md";
 import { invoke, listen, emit } from "../lib/tauri.js";
 import { useT } from "../lib/i18n.js";
 import { useClockSeconds } from "../lib/useClockSeconds.js";
@@ -467,6 +467,13 @@ export default function App() {
         lang={lang}
         right={
           <>
+            <button
+              onClick={() => invoke("open_wheel").catch(() => {})}
+              title={t("settings.shortcuts.captureOpenWheel")}
+              className="flex h-9 w-9 items-center justify-center rounded-full text-stone-500 transition hover:bg-stone-800 hover:text-stone-200"
+            >
+              <MdDonutLarge size={18} />
+            </button>
             <div className="flex items-center gap-0.5 rounded-full bg-stone-900/60 p-0.5">
               {[
                 { mode: "area", icon: MdCropFree, label: t("recorder.area") },

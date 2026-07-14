@@ -154,6 +154,15 @@ pub fn wheel_closed(app: AppHandle) {
     schedule_idle_destroy(&app);
 }
 
+/// Opens (or toggles) the radial wheel — same entry point as its hotkey and
+/// tray item, exposed for the gallery title-bar button. `async` for the same
+/// reason as `recorder::open_recorder`: a sync command building/showing a
+/// window from inside its own IPC callback freezes the app.
+#[tauri::command]
+pub async fn open_wheel(app: AppHandle) {
+    open(&app);
+}
+
 /// Wedge click → close the wheel and run the picked action through the same
 /// paths the dedicated hotkeys use. `folder` overrides the recording folder
 /// for actions that start a recording directly.

@@ -183,6 +183,7 @@ pub fn run() {
             library::open_url,
             translate::translate_text,
             wheel::wheel_action,
+            wheel::open_wheel,
             wheel::wheel_closed,
             sound::preview_sound_effect,
             sound::pick_sound_file,
