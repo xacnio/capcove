@@ -298,7 +298,14 @@ pub enum MixPriority {
 impl Default for AudioConfig {
     fn default() -> Self {
         Self {
-            sources: Vec::new(),
+            // Record the default system output out of the box (empty
+            // device_id = OS default; empty label = "System Audio").
+            sources: vec![AudioSource::SystemOutput {
+                device_id: String::new(),
+                label: String::new(),
+                enabled: true,
+                main_mix: true,
+            }],
             system_muted: false,
             mic_muted: false,
             separate_tracks: true,
@@ -758,7 +765,7 @@ pub struct VideoSettings {
     pub replay_buffer: ReplayBufferSettings,
     /// Which screen corner the on-screen "recording in progress" indicator
     /// anchors to.
-    #[serde(default)]
+    #[serde(default = "default_hud_corner")]
     pub hud_corner: HudCorner,
     /// Per-badge visibility/icon for the on-screen HUD — see
     /// `HudBadgeSettings`.
@@ -767,7 +774,7 @@ pub struct VideoSettings {
     /// Which screen corner in-app toast notifications (recording started/
     /// stopped, errors, etc.) slide in from — independent of `hud_corner`
     /// since the REC dot and toasts don't need to share a spot.
-    #[serde(default)]
+    #[serde(default = "default_toast_corner")]
     pub toast_corner: HudCorner,
     /// Which toast categories are enabled — see `ToastCategorySettings`.
     #[serde(default)]
@@ -797,9 +804,9 @@ impl Default for VideoSettings {
             audio: AudioConfig::default(),
             audio_codec: AudioCodec::default(),
             resolution: RecordingResolution::default(),
-            hud_corner: HudCorner::default(),
+            hud_corner: default_hud_corner(),
             hud_badges: HudBadgeSettings::default(),
-            toast_corner: HudCorner::default(),
+            toast_corner: default_toast_corner(),
             toast_categories: ToastCategorySettings::default(),
             minimized_behavior: MinimizedBehavior::default(),
             youtube_live: YoutubeLiveSettings::default(),
@@ -808,6 +815,8 @@ impl Default for VideoSettings {
 }
 
 fn default_true() -> bool { true }
+fn default_hud_corner() -> HudCorner { HudCorner::BottomRight }
+fn default_toast_corner() -> HudCorner { HudCorner::TopLeft }
 fn default_quality() -> u32 { 23 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -958,7 +967,7 @@ impl Default for Settings {
             google_client_secret: String::new(),
             sync_paused: false,
             start_with_gallery: true,
-            sync_mode: SyncMode::LocalFirst,
+            sync_mode: SyncMode::Manual,
             language: "en".into(),
             run_as_admin: false,
             onboarded: false,
