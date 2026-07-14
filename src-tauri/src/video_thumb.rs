@@ -687,6 +687,16 @@ fn thumb_cache_dir(app: &AppHandle) -> Option<PathBuf> {
 /// Generates (if not already cached) a 320px-wide JPEG thumbnail for `name`, returning its
 /// cache file path. Seeks to 1s in to skip the black opening frame (falls back to 0s for very
 /// short clips); the cache path mirrors `name`'s folder structure and is created explicitly.
+/// ffmpeg prints a multi-line version and build-config banner on every run; keep only
+/// the trailing non-empty lines, which carry the actual failure (e.g. a truncated file
+/// with no moov atom), so a thumbnail error is one readable line instead of a wall of text.
+fn ffmpeg_error_tail(stderr: &[u8]) -> String {
+    let text = String::from_utf8_lossy(stderr);
+    let lines: Vec<&str> = text.lines().map(str::trim).filter(|l| !l.is_empty()).collect();
+    let start = lines.len().saturating_sub(3);
+    lines[start..].join("; ")
+}
+
 pub(crate) async fn ensure_thumbnail_cached(app: &AppHandle, name: &str) -> Result<PathBuf, String> {
     let source = app.state::<Arc<ConfigStore>>().get().resolved_recordings_dir().join(name);
     let Some(cache_dir) = thumb_cache_dir(app) else { return Err("no cache dir".into()) };
@@ -722,7 +732,7 @@ pub(crate) async fn ensure_thumbnail_cached(app: &AppHandle, name: &str) -> Resu
             .await
             .map_err(|e| e.to_string())?;
         if !output.status.success() {
-            return Err(format!("ffmpeg thumbnail failed: {}", String::from_utf8_lossy(&output.stderr)));
+            return Err(format!("ffmpeg thumbnail failed: {}", ffmpeg_error_tail(&output.stderr)));
         }
     }
     Ok(cache_path)

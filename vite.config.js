@@ -7,7 +7,11 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   clearScreen: false,
+  optimizeDeps: {
+    include: ["react-icons/md", "react-icons/si", "react-icons/fi"],
+  },
   server: {
+    host: "127.0.0.1",
     port: 1420,
     strictPort: true,
   },
