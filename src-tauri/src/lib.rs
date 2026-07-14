@@ -392,6 +392,8 @@ pub fn run() {
             #[cfg(windows)]
             app.manage(recording::encoder::AutoEncoderCache::default());
             #[cfg(windows)]
+            app.manage(recording::encoder::EncoderListCache::default());
+            #[cfg(windows)]
             app.manage(Arc::new(recording::CrashRecoveryState::default()));
             #[cfg(windows)]
             app.manage(Arc::new(recording::replay_buffer::ReplayCrashRecoveryState::default()));
@@ -442,6 +444,17 @@ pub fn run() {
             #[cfg(windows)]
             {
                 tauri::async_runtime::spawn_blocking(win_util::request_borderless_capture_access);
+            }
+            // Probe available encoders up front (each is a real ffmpeg dry-run)
+            // so the settings/onboarding UIs read them from cache instantly
+            // instead of waiting on every open.
+            #[cfg(windows)]
+            {
+                let app_handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    let _ = recording::encoder::cached_available_encoders(&app_handle).await;
+                    let _ = recording::resolve_encoder(&app_handle, &config::EncoderChoice::Auto).await;
+                });
             }
             #[cfg(windows)]
             {

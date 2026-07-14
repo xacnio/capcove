@@ -16,11 +16,35 @@ use crate::config::EncoderChoice;
 #[derive(Default)]
 pub struct AutoEncoderCache(Mutex<Option<EncoderChoice>>);
 
+/// Caches the full `list_available_encoders` probe for the app's lifetime.
+/// Each hardware candidate is probed with a real ffmpeg dry-run, so the first
+/// run is slow — warmed once at startup so the settings/onboarding UIs get it
+/// instantly instead of waiting every time they open.
+#[derive(Default)]
+pub struct EncoderListCache(Mutex<Option<Vec<EncoderInfo>>>);
+
 #[derive(Debug, Clone, Serialize)]
 pub struct EncoderInfo {
     pub kind: EncoderChoice,
     pub label: String,
     pub available: bool,
+}
+
+/// Cached `list_available_encoders` — returns the warmed result if present,
+/// otherwise probes once and caches it. Callers (settings, onboarding, the
+/// startup warm-up) all go through this so the probe runs at most once.
+pub async fn cached_available_encoders(app: &AppHandle) -> Vec<EncoderInfo> {
+    use tauri::Manager;
+    if let Some(cache) = app.try_state::<EncoderListCache>() {
+        if let Some(cached) = cache.0.lock().unwrap().clone() {
+            return cached;
+        }
+    }
+    let list = list_available_encoders(app).await;
+    if let Some(cache) = app.try_state::<EncoderListCache>() {
+        *cache.0.lock().unwrap() = Some(list.clone());
+    }
+    list
 }
 
 /// All concrete (non-`Auto`) encoder candidates, in the order they're shown

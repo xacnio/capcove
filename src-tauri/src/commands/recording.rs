@@ -4,7 +4,7 @@ use std::sync::Arc;
 use tauri::{AppHandle, Manager};
 
 use crate::recording::audio_capture::{list_devices, AudioDeviceInfo, AudioFlow};
-use crate::recording::encoder::{list_available_encoders as list_encoders, EncoderInfo};
+use crate::recording::encoder::{cached_available_encoders as list_encoders, EncoderInfo};
 use crate::recording::replay_buffer::{self, PendingClipState, ReplayBufferManager, ReplayBufferStatus, ReplayCrashRecoveryState};
 use crate::recording::{self, RecordingManager, RecordingSession};
 

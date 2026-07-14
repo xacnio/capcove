@@ -21,8 +21,9 @@ const LANGUAGES = [
 // onboarding-only rephrasing.
 function VideoQuickStep({ draft, apply, t }) {
   const video = draft.video ?? {};
-  const [encoders, setEncoders] = useState([]);
+  const [encoders, setEncoders] = useState(null); // null = still probing
   useEffect(() => { invoke("list_available_encoders").then(setEncoders).catch(() => setEncoders([])); }, []);
+  const loadingEncoders = encoders === null;
   const setV = (patch) => apply({ video: { ...video, ...patch } });
   return (
     <Card>
@@ -37,12 +38,15 @@ function VideoQuickStep({ draft, apply, t }) {
         </select>
       </Row>
       <Row label={t("settings.video.encoder")}>
-        <select className={inputCls} value={video.encoder ?? "auto"} onChange={(e) => setV({ encoder: e.target.value })}>
-          <option value="auto">{ENCODER_LABELS.auto ?? "Auto"}</option>
-          {encoders.filter((e) => e.available).map((e) => (
-            <option key={e.kind} value={e.kind}>{ENCODER_LABELS[e.kind] ?? e.label ?? e.kind}</option>
-          ))}
-        </select>
+        <div className="flex items-center gap-2">
+          <select className={inputCls} value={video.encoder ?? "auto"} disabled={loadingEncoders} onChange={(e) => setV({ encoder: e.target.value })}>
+            <option value="auto">{ENCODER_LABELS.auto ?? "Auto"}</option>
+            {(encoders ?? []).filter((e) => e.available).map((e) => (
+              <option key={e.kind} value={e.kind}>{ENCODER_LABELS[e.kind] ?? e.label ?? e.kind}</option>
+            ))}
+          </select>
+          {loadingEncoders && <span className="shrink-0 text-xs text-stone-500">{t("common.loading")}</span>}
+        </div>
       </Row>
     </Card>
   );
