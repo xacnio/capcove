@@ -1320,6 +1320,14 @@ export default {
         title: "Kayıt Modu",
         body: "Bu, Capcove'un Instant Replay özelliği — tam ekran bir oyuna başladığın anda neyin otomatik olarak devreye gireceğine karar ver. İstediğin zaman Ayarlar → Kayıt'tan değiştirebilirsin.",
       },
+      video: {
+        title: "Video Kalitesi",
+        body: "Kayıt çözünürlüğü, kare hızı ve encoder'ı ayarla. Her şeyi sonradan Ayarlar → Kayıt'tan ince ayar yapabilirsin.",
+      },
+      audio: {
+        title: "Ses Kaynakları",
+        body: "Hangi sistem sesi ve mikrofonun kaydedileceğini seç. İstediğin zaman Ayarlar → Ses'ten değiştirebilirsin.",
+      },
       shortcuts: {
         title: "Klavye Kısayolları",
         body: "Kayıt ve klip almak için klavye kısayollarını özelleştir. Farklı yakalama modları ve eylemlerle birden fazla kısayol ekleyebilirsin.",

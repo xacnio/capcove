@@ -1320,6 +1320,14 @@ export default {
         title: "Recording Mode",
         body: "This is Capcove's Instant Replay — decide what happens automatically the moment you start playing a fullscreen game. Fine-tune it anytime from Settings → Record.",
       },
+      video: {
+        title: "Video Quality",
+        body: "Set the recording resolution, frame rate, and encoder. You can fine-tune everything later from Settings → Record.",
+      },
+      audio: {
+        title: "Audio Sources",
+        body: "Choose which system audio and microphone to capture. Adjust these anytime from Settings → Audio.",
+      },
       shortcuts: {
         title: "Keyboard Shortcuts",
         body: "Customize the keyboard shortcuts for recording and clipping. You can add multiple shortcuts with different capture modes and actions.",

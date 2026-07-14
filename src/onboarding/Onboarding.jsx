@@ -1,20 +1,100 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "../lib/tauri.js";
 import { useT } from "../lib/i18n.js";
-import { Toggle, Row, Button, Card } from "../components/settingsUI.jsx";
-import { RecordingModeCard } from "../components/RecordSettingsCard.jsx";
+import { Toggle, Row, Button, Card, inputCls } from "../components/settingsUI.jsx";
+import { RecordingModeCard, FPS_OPTIONS, RESOLUTION_OPTIONS, ENCODER_LABELS } from "../components/RecordSettingsCard.jsx";
 import { ShortcutCard } from "../components/ShortcutEditor.jsx";
 import LegalDocModal from "../components/LegalDocModal.jsx";
 import { LEGAL_VERSION } from "../lib/legal.js";
 import logo from "../assets/logo.png";
 
-const STEPS = ["welcome", "language", "recordingMode", "shortcuts", "drive", "startup", "finish"];
+const STEPS = ["welcome", "language", "recordingMode", "video", "audio", "shortcuts", "drive", "startup", "finish"];
 const TOTAL = STEPS.length;
 
 const LANGUAGES = [
   { code: "en", label: "English" },
   { code: "tr", label: "Türkçe" },
 ];
+
+// Quick video subset for the wizard: resolution, frame rate, encoder — the
+// same fields (and options) as Settings → Record, so nothing here is a
+// onboarding-only rephrasing.
+function VideoQuickStep({ draft, apply, t }) {
+  const video = draft.video ?? {};
+  const [encoders, setEncoders] = useState([]);
+  useEffect(() => { invoke("list_available_encoders").then(setEncoders).catch(() => setEncoders([])); }, []);
+  const setV = (patch) => apply({ video: { ...video, ...patch } });
+  return (
+    <Card>
+      <Row label={t("settings.video.resolution")}>
+        <select className={inputCls} value={video.resolution ?? "native"} onChange={(e) => setV({ resolution: e.target.value })}>
+          {RESOLUTION_OPTIONS.map(([val, label]) => <option key={val} value={val}>{label}</option>)}
+        </select>
+      </Row>
+      <Row label={t("settings.video.fps")}>
+        <select className={inputCls} value={video.fps ?? 60} onChange={(e) => setV({ fps: Number(e.target.value) })}>
+          {FPS_OPTIONS.map((f) => <option key={f} value={f}>{f}</option>)}
+        </select>
+      </Row>
+      <Row label={t("settings.video.encoder")}>
+        <select className={inputCls} value={video.encoder ?? "auto"} onChange={(e) => setV({ encoder: e.target.value })}>
+          <option value="auto">{ENCODER_LABELS.auto ?? "Auto"}</option>
+          {encoders.filter((e) => e.available).map((e) => (
+            <option key={e.kind} value={e.kind}>{ENCODER_LABELS[e.kind] ?? e.label ?? e.kind}</option>
+          ))}
+        </select>
+      </Row>
+    </Card>
+  );
+}
+
+// Quick audio subset: the System Audio + Microphone primary device rows,
+// mirroring `PrimaryDeviceRow`'s add/remove-source semantics from the full
+// Audio settings card.
+function AudioQuickStep({ draft, apply, t }) {
+  const video = draft.video ?? {};
+  const audio = video.audio ?? {};
+  const sources = audio.sources ?? [];
+  const [devices, setDevices] = useState({ outputs: [], inputs: [] });
+  useEffect(() => {
+    invoke("list_audio_devices").then(setDevices).catch(() => setDevices({ outputs: [], inputs: [] }));
+  }, []);
+  const applyAudio = (next) => apply({ video: { ...video, audio: { ...audio, sources: next } } });
+
+  const DeviceRow = ({ kind, label, devs }) => {
+    const source = sources.find((s) => s.kind === kind);
+    const setDevice = (deviceId) => {
+      const idx = sources.findIndex((s) => s.kind === kind);
+      const entry = { ...(idx >= 0 ? sources[idx] : {}), kind, device_id: deviceId, label, enabled: true };
+      applyAudio(idx >= 0 ? sources.map((s, i) => (i === idx ? entry : s)) : [...sources, entry]);
+    };
+    const toggle = () => {
+      const idx = sources.findIndex((s) => s.kind === kind);
+      if (idx >= 0) applyAudio(sources.filter((_, i) => i !== idx));
+      else setDevice(devs[0]?.id ?? "");
+    };
+    return (
+      <Row label={label}>
+        <div className="flex items-center gap-2">
+          {source && (
+            <select className={inputCls} value={source.device_id ?? devs[0]?.id ?? ""} onChange={(e) => setDevice(e.target.value)}>
+              {devs.length === 0 && <option value="">{t("settings.audio.noDevices")}</option>}
+              {devs.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
+            </select>
+          )}
+          <Toggle labeled checked={!!source} onChange={toggle} />
+        </div>
+      </Row>
+    );
+  };
+
+  return (
+    <Card>
+      <DeviceRow kind="system_output" label={t("settings.audio.systemAudio")} devs={devices.outputs ?? []} />
+      <DeviceRow kind="microphone" label={t("settings.audio.microphone")} devs={devices.inputs ?? []} />
+    </Card>
+  );
+}
 
 export default function Onboarding({ onClose }) {
   const [draft,           setDraft]           = useState(null);
@@ -187,6 +267,10 @@ export default function Onboarding({ onClose }) {
                   )}
                 </div>
               )}
+
+              {stepKey === "video" && <VideoQuickStep draft={draft} apply={apply} t={t} />}
+
+              {stepKey === "audio" && <AudioQuickStep draft={draft} apply={apply} t={t} />}
 
               {/* Shortcuts */}
               {stepKey === "shortcuts" && (
