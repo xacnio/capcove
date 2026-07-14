@@ -593,8 +593,8 @@ export default {
       title: "Google Drive",
       sync: "Senkronizasyon",
       syncModes: {
-        full:       { label: "Tam Senkronizasyon", desc: "Local ↔ Drive — yeni dosyalar otomatik indirilir" },
-        localFirst: { label: "Yerel Öncelikli",    desc: "Local → Drive yükler; Drive dosyaları görünür ama indirilmez", recommended: "Önerilen" },
+        full:       { label: "Tam Senkronizasyon", desc: "Local ↔ Drive — yeni dosyalar otomatik indirilir", warn: "Kayıtlar büyüktür — her videoyu otomatik yüklemek Drive alanını hızla doldurabilir." },
+        localFirst: { label: "Yerel Öncelikli",    desc: "Local → Drive yükler; Drive dosyaları görünür ama indirilmez", warn: "Kayıtlar büyüktür — her videoyu otomatik yüklemek Drive alanını hızla doldurabilir." },
         manual:     { label: "Elle",               desc: "Otomatik yükleme/indirme yok; elle senkronize et" },
       },
       folderName: "Drive klasör adı",

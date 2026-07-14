@@ -593,8 +593,8 @@ export default {
       title: "Google Drive",
       sync: "Sync",
       syncModes: {
-        full:       { label: "Full Sync",        desc: "Local ↔ Drive — new files are downloaded automatically" },
-        localFirst: { label: "Local Priority",   desc: "Local → Drive upload; Drive files visible but not downloaded", recommended: "Recommended" },
+        full:       { label: "Full Sync",        desc: "Local ↔ Drive — new files are downloaded automatically", warn: "Recordings are large — auto-uploading every video can fill your Drive storage fast." },
+        localFirst: { label: "Local Priority",   desc: "Local → Drive upload; Drive files visible but not downloaded", warn: "Recordings are large — auto-uploading every video can fill your Drive storage fast." },
         manual:     { label: "Manual",           desc: "No auto upload/download; sync manually" },
       },
       folderName: "Drive folder name",

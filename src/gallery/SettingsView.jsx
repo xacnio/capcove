@@ -681,18 +681,18 @@ export default function SettingsView({ t, lang, dateLocale, onRerunWizard, reque
                 { value: "full",        ...t("settings.drive.syncModes.full") },
                 { value: "local_first", ...t("settings.drive.syncModes.localFirst") },
                 { value: "manual",      ...t("settings.drive.syncModes.manual") },
-              ].map(({ value, label, desc, recommended }) => (
+              ].map(({ value, label, desc, warn }) => (
                 <div key={value} onClick={() => apply({ sync_mode: value })}
                   className="flex items-start gap-2.5 cursor-pointer px-3 py-1.5 rounded hover:bg-stone-800/50 transition">
                   <Radio checked={settings.sync_mode === value}
                     onChange={() => apply({ sync_mode: value })}
                     className="mt-0.5" />
                   <span className="flex flex-col">
-                    <span className="text-xs text-stone-200 font-medium">
-                      {label}
-                      {recommended && <span className="ml-1.5 text-sky-500 text-[10px]">{recommended}</span>}
-                    </span>
+                    <span className="text-xs text-stone-200 font-medium">{label}</span>
                     <span className="text-[11px] text-stone-500">{desc}</span>
+                    {warn && settings.sync_mode === value && (
+                      <span className="mt-0.5 text-[11px] text-amber-500/90">⚠ {warn}</span>
+                    )}
                   </span>
                 </div>
               ))}
