@@ -107,7 +107,12 @@ impl GraphicsCaptureApiHandler for FrameSource {
         let full_h = buffer.height();
         let data = buffer.as_nopadding_buffer()?;
 
-        if let Some((cx, cy, cw, ch)) = self.crop {
+        // `Window::title_bar_height()` double-applies DPI scaling on a
+        // per-monitor-aware caller, which can wrap negative into a huge
+        // `u32` — skip a crop that would eat half the frame or more.
+        let crop = self.crop.filter(|&(_, cy, _, _)| cy < full_h / 2);
+
+        if let Some((cx, cy, cw, ch)) = crop {
             let cx = cx.min(full_w.saturating_sub(1));
             let cy = cy.min(full_h.saturating_sub(1));
             let cw = cw.min(full_w.saturating_sub(cx)).max(1);
