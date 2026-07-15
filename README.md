@@ -4,7 +4,7 @@
   <p>Screen &amp; game recorder with Instant Replay, YouTube live streaming, and automatic Google Drive sync, built with Tauri 2 + React</p>
 
   [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-  [![Version](https://img.shields.io/badge/version-1.0.3-blue)](https://github.com/xacnio/capcove/releases)
+  [![Version](https://img.shields.io/badge/version-1.0.4-blue)](https://github.com/xacnio/capcove/releases)
   [![Website](https://img.shields.io/badge/website-capcove-orange)](https://xacnio.github.io/capcove/)
 
   <a href="https://apps.microsoft.com/detail/9NXZDV6V9HRX?launch=true&mode=full" target="_blank">
