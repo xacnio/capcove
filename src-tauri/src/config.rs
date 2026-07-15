@@ -1055,12 +1055,15 @@ impl Settings {
     /// Finds a folder by name; a game-specific folder match wins over a same-named global
     /// one, since the path alone can't disambiguate the two (see `video_thumb::folder_name_of`).
     pub fn folder_by_name_scoped(&self, name: &str, game: Option<&str>) -> Option<&RecordingFolder> {
+        // Case-insensitive: Windows folder names are (see `create_recording_folder`'s
+        // duplicate check) — a case-sensitive match here would let a folder
+        // reappear under a differently-cased name as a second, aliased entry.
         if let Some(g) = game {
-            if let Some(f) = self.recording_folders.iter().find(|f| f.name == name && f.game.as_deref() == Some(g)) {
+            if let Some(f) = self.recording_folders.iter().find(|f| f.name.eq_ignore_ascii_case(name) && f.game.as_deref() == Some(g)) {
                 return Some(f);
             }
         }
-        self.recording_folders.iter().find(|f| f.name == name && f.game.is_none())
+        self.recording_folders.iter().find(|f| f.name.eq_ignore_ascii_case(name) && f.game.is_none())
     }
 }
 

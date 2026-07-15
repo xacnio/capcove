@@ -631,6 +631,20 @@ pub fn discover_recording_folders(app: &AppHandle) {
     let root = settings.resolved_recordings_dir();
     let Ok(root_entries) = std::fs::read_dir(&root) else { return };
 
+    // Prune entries whose physical directory is gone (deleted outside the
+    // app, e.g. via Explorer) — otherwise the stale rule lingers forever,
+    // and its name keeps blocking/mismatching re-registration if a folder
+    // by the same name shows up again later.
+    let before = settings.recording_folders.len();
+    settings.recording_folders.retain(|f| {
+        let dir = match &f.game {
+            Some(g) => root.join(crate::drive::sanitize_filename(g)).join(&f.name),
+            None => root.join(&f.name),
+        };
+        dir.is_dir()
+    });
+    let pruned = settings.recording_folders.len() != before;
+
     // A game folder isn't always in the catalog/custom list yet (or ever) —
     // any file already tagged with that app name is just as good a signal.
     let tagged_app_names: std::collections::HashSet<String> = meta.get_all()
@@ -673,7 +687,7 @@ pub fn discover_recording_folders(app: &AppHandle) {
         }
     }
 
-    if new_folders.is_empty() { return; }
+    if new_folders.is_empty() && !pruned { return; }
     settings.recording_folders.extend(new_folders);
     if config.save(settings).is_ok() {
         let _ = app.emit("settings-changed", ());
