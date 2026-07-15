@@ -65,6 +65,10 @@ export default function VideoPlayer({ src, name, path, t, className = "", autoPl
   // actual pixel size instead, scrolling if that's bigger than the box.
   const [displayMode, setDisplayMode] = useState(() => localStorage.getItem(DISPLAY_MODE_KEY) || "fit");
   const [videoNativeSize, setVideoNativeSize] = useState(null); // {w, h} once metadata loads
+  // Covers both "still resolving `resolvedSrc`" and the `<video>` element's
+  // own buffering (initial load, or a mid-playback stall) — without this the
+  // player just shows a black/frozen frame with no feedback during either.
+  const [loading, setLoading] = useState(true);
 
   // Grabs keyboard focus as soon as a video opens, so space/arrows/etc.
   // (see `onKeyDown` below) work immediately without an extra click.
@@ -375,7 +379,7 @@ export default function VideoPlayer({ src, name, path, t, className = "", autoPl
   // it, even though the new video is actually playing normally underneath.
   useEffect(() => {
     setTrimStart(0); setTrimEnd(null); setSaveClipError(""); setPlayMode("full"); setVideoNativeSize(null);
-    setDuration(0); setCurrent(0);
+    setDuration(0); setCurrent(0); setLoading(true);
     userPausedRef.current = false;
   }, [resolvedSrc]);
   useEffect(() => {
@@ -662,13 +666,19 @@ export default function VideoPlayer({ src, name, path, t, className = "", autoPl
                 setVideoNativeSize({ w: e.currentTarget.videoWidth, h: e.currentTarget.videoHeight });
               }}
               onVolumeChange={(e) => { setVolume(e.currentTarget.volume); setMuted(e.currentTarget.muted); }}
+              onLoadedData={() => setLoading(false)}
+              onWaiting={() => setLoading(true)}
+              onPlaying={() => setLoading(false)}
+              onCanPlay={() => setLoading(false)}
             />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center">
-              <div className="h-8 w-8 animate-spin rounded-full border-2 border-stone-600 border-t-stone-200" />
-            </div>
-          )}
+          ) : null}
         </div>
+
+        {(!resolvedSrc || loading) && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <div className="h-10 w-10 animate-spin rounded-full border-[3px] border-white/20 border-t-white" />
+          </div>
+        )}
 
         {/* Scrub-preview capture sources — kept technically visible
             (opacity-0, not display:none) since display:none video can stop
@@ -676,7 +686,7 @@ export default function VideoPlayer({ src, name, path, t, className = "", autoPl
         <video ref={previewVideoRef} muted crossOrigin="anonymous" className="pointer-events-none absolute left-0 top-0 h-px w-px opacity-0" />
         <video ref={prefetchVideoRef} muted crossOrigin="anonymous" className="pointer-events-none absolute left-0 top-0 h-px w-px opacity-0" />
 
-        {!playing && (
+        {!playing && !loading && resolvedSrc && (
           // Hit area is just the circle itself, not the whole box — a
           // full-cover button here would sit on top of (and swallow clicks
           // meant for) the inner layer's scrollbar in "original size" mode.
